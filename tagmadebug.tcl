@@ -70,10 +70,10 @@ proc ::TagmaDebug::Break {name1 name2 op} {
     }
     uplevel 1 ::TagmaDebug::debug
 
-    # Turn tracing back on for ::TagmaDebug::__TagmaDebugMain, if it previously was.
+    # Turn tracing back on for __TagmaDebugMain, if it previously was.
     variable step
-    if {[lsearch -exact $step "::TagmaDebug::__TagmaDebugMain"] >= 0} {
-        trace add execution ::TagmaDebug::__TagmaDebugMain enterstep ::TagmaDebug::Step
+    if {[lsearch -exact $step "__TagmaDebugMain"] >= 0} {
+        trace add execution __TagmaDebugMain enterstep ::TagmaDebug::Step
     }
 }
 
@@ -129,10 +129,10 @@ proc ::TagmaDebug::Log {name1 name2 op} {
         }
     }
 
-    # Turn tracing back on for ::TagmaDebug::__TagmaDebugMain, if it previously was.
+    # Turn tracing back on for __TagmaDebugMain, if it previously was.
     variable step
-    if {[lsearch -exact $step "::TagmaDebug::__TagmaDebugMain"] >= 0} {
-        trace add execution ::TagmaDebug::__TagmaDebugMain enterstep ::TagmaDebug::Step
+    if {[lsearch -exact $step "__TagmaDebugMain"] >= 0} {
+        trace add execution __TagmaDebugMain enterstep ::TagmaDebug::Step
     }
 }
 
@@ -295,11 +295,11 @@ proc ::TagmaDebug::Unleave {name} {
 #   Prints the command that is about to be executed
 #   Enters the debugger prompt.
 proc ::TagmaDebug::Step {cmdstring op} {
-    if {[string range $cmdstring 0 14] eq "::TagmaDebug::Log" ||
+    if {[string range $cmdstring 0 16] eq "::TagmaDebug::Log" ||
         [string range $cmdstring 0 18] eq "::TagmaDebug::Break"} {
-        # Disable tracing on ::TagmaDebug::__TagmaDebugMain.
+        # Disable tracing on __TagmaDebugMain.
         # Don't want to trace variable breakpoints...
-        trace remove execution ::TagmaDebug::__TagmaDebugMain enterstep ::TagmaDebug::Step
+        trace remove execution __TagmaDebugMain enterstep ::TagmaDebug::Step
         return
     }
 
