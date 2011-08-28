@@ -1,0 +1,95 @@
+NAME
+    TagmaDebug - Interactive TCL Debugger
+
+SYNOPSIS
+    tagmadebug.tcl <YourScript.tcl>
+
+OPTIONS
+    *NONE* Only takes a TCL script to be debugged.
+
+DESCRIPTION
+    TagmaDebug is a simple interactive debugger for TCL programs.
+
+    When TagmaDebug starts it creates a trace on "__TagmaDebugMain." This
+    procedure sources the script provided on the command line. The trace on
+    this procedure basically causes a break on every command. Once the
+    script completes the procedure "__TagmaDebugComplete" is called. There
+    is a hidden enter trace on this procedure to ensure the user gets the
+    debugger prompt one last time.
+
+    All output from the debugger is written to stderr. This allows for
+    redirection of the program or debugger output if desired.
+
+COMMANDS
+    There are a few interactive commands that control the debugger. There is
+    no line editing and very little nicety.
+
+    h or ?      Prints the help text.
+
+    a or >      Prints the command being executed.
+
+    p           Prints the current level & procedure. When at the top level
+                '::' is printed for the procedure.
+
+    e or [..]   Evaluates TCL code. When using [..] The closing ']' is
+                required.
+
+    !           Executes a shell command.
+
+    =           Prints the content of each variable name proided.
+
+    var log     Logs all modifications of a variable to stderr.
+
+    var break   Adds breakpoint for writes to a variable.
+
+    var info    Prints all variables being watched for.
+
+    var clear   Clears logging and breaks for variables. Passes the variable
+                to [string match ...] so globbing can be used.
+
+    cmd enter   Set a break point for the entering of a command.
+
+    cmd leave   Set a break point for the leaving of a command.
+
+    cmd step    Steps through the command. Every command that is executed
+                inside the command is a breakpoint.
+
+    cmd clear   Clear break points. Passes the command to [string match ...]
+                so globbing can be used.
+
+    c or Enter  Continue execution. Change the variable "entercontinues" at
+                the top of the script to "0" to disable Enter acting as
+                continue.
+
+    r           Restarts the program.
+
+    v           Toggle verbosity. Print extra info, when available.
+
+    x or q      Exit the debugger. Ctrl-D should also have the same effect.
+
+PORTABILITY
+    TagmaDebug should work with any TCL version 8.4 or later. Testing has
+    thus far been limited to Tcl 8.5 under Cygwin on Windows 7.
+
+INSTALLATION
+    Either copy tagmadebug.tcl where you want it or run "make install".
+
+HOME
+    <https://github.com/LStinson/TagmaDebug>
+
+COPYRIGHT
+    This script is derived from "TclDebugger by S.Arnold. v0.1 2007-09-09" -
+    <<http://wiki.tcl.tk/19872>>. What ever copyright he says his code is
+    under is what applies to this one. Since it was listed publicly with no
+    restrictions I am assuming it is free to modify.
+
+AUTHOR
+    Written by Lorance Stinson AT Gmail....
+
+POD ERRORS
+    Hey! The above document had some coding errors, which are explained
+    below:
+
+    Around line 113:
+        You forgot a '=back' before '=head1'
+
