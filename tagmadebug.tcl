@@ -1,6 +1,6 @@
 #!/usr/bin/env tclsh
 # tagma.tcl --
-# Last Modified: 2011-08-27
+# Last Modified: 2011-08-28
 #
 # Implements simple debugging for TCL.
 # By Lorance Stinson AT Gmail.....
@@ -16,6 +16,7 @@ namespace eval ::TagmaDebug:: {
     variable leave ""
     variable step ""
     variable prompt "Tagma> "
+    variable prefix ">>"
     variable description "TagmaDebug by Lorance Stinson AT Gmail..."
     variable verbose 0
     variable debugInTagma 0
@@ -74,10 +75,11 @@ proc ::TagmaDebug::PrintVariable {varname} {
         uplevel 1 parray $varname
         return
     }
+    variable prefix
     if {[uplevel 1 info exists $varname]} {
-        eputs "$varname = [uplevel 1 set $varname]"
+        eputs "$prefix $varname = [uplevel 1 set $varname]"
     } else {
-        eputs "variable $varname does not exist"
+        eputs "$prefix Variable '$varname' does not exist."
     }
 }
 
@@ -131,12 +133,13 @@ proc ::TagmaDebug::var {name key} {
 #   Disables logging if the variable was unset.
 #   Re-enables command tracing.
 proc ::TagmaDebug::Break {name1 name2 op} {
+    variable prefix
     switch -- $op {
         read - write {
-            eputs "$op [var $name1 $name2] = [uplevel 1 set [var $name1 $name2]]"
+            eputs "$prefix $op [var $name1 $name2] = [uplevel 1 set [var $name1 $name2]]"
         }
         unset {
-            eputs "unset [var $name1 $name2]"
+            eputs "$prefix unset [var $name1 $name2]"
             # Stop tracing this variable if it is unset.
             if {[Unbreak [var $name1 $name2]] < 0} {
                 Unbreak $name1
@@ -189,12 +192,13 @@ proc ::TagmaDebug::Unbreak {name} {
 #   Disables logging if the variable was unset.
 #   Re-enables command tracing.
 proc ::TagmaDebug::Log {name1 name2 op} {
+    variable prefix
     switch -- $op {
         read - write {
-            eputs "$op [var $name1 $name2] = [uplevel 1 set [var $name1 $name2]]"
+            eputs "$prefix $op [var $name1 $name2] = [uplevel 1 set [var $name1 $name2]]"
         }
         unset {
-            eputs "unset [var $name1 $name2]"
+            eputs "$prefix unset [var $name1 $name2]"
             # Stop tracing this variable if it is unset.
             if {[Unlog [var $name1 $name2]] < 0} {
                 Unlog $name1
@@ -256,12 +260,13 @@ proc ::TagmaDebug::Enter {cmdstring op} {
         return
     }
 
+    variable prefix
     switch -- $op {
         enter {
-            eputs "Entering: [lindex $cmdstring 0]"
+            eputs "$prefix Entering: [lindex $cmdstring 0]"
             variable verbose
             if {$verbose} {
-                eputs "Args: [list [lrange $cmdstring 1 end]]"
+                eputs "$prefix Args: [list [lrange $cmdstring 1 end]]"
             }
         }
         default {
@@ -317,13 +322,14 @@ proc ::TagmaDebug::Leave {cmdstring code result op} {
         return
     }
 
+    variable prefix
     switch -- $op {
         leave {
-            eputs "Leaving: [lindex $cmdstring 0]"
+            eputs "$prefix Leaving: [lindex $cmdstring 0]"
             variable verbose
             if {$verbose} {
-                eputs "Result Code: $code"
-                eputs "Result: [list $result]"
+                eputs "$prefix Result Code: $code"
+                eputs "$prefix Result: [list $result]"
             }
         }
         default {
@@ -377,15 +383,19 @@ proc ::TagmaDebug::_Step {cmdstring op} {
     variable debugInTagma
     if {$debugInTagma} { return }
 
-    if {[string range $cmdstring 0 13] eq "::TagmaDebug::"} {
+    if {[string range $cmdstring 0 13] eq "::TagmaDebug::" ||
+        [string match "::unknown *" $cmdstring]} {
         # Disable tracing for commands.
         set debugInTagma 1
         return
     }
 
+    variable prefix
     switch -- $op {
         enterstep {
-            eputs $cmdstring
+            foreach line [split $cmdstring "\n\r"] {
+                eputs "$prefix $line"
+            }
         }
         default {
             error "Step: Unknown OP '$op' for '$cmdstring'."
@@ -479,6 +489,7 @@ proc ::TagmaDebug::PrintHelp {} {
 
 # ::TagmaDebug::debug --
 #   The interactive part of the debugger.
+#   Prompts the user for input and acts on it.
 #
 # Arguments:
 #   cmdstring   The optional command that is about to be executed.
@@ -585,7 +596,7 @@ proc ::TagmaDebug::debug {{cmdstring ""}} {
                             }
                         }
                     }
-                    default { eputs "no such subcommand: $subcmd" }
+                    default { eputs "No such option: $subcmd" }
                 }
             }
             cmd     {
@@ -646,7 +657,7 @@ proc ::TagmaDebug::debug {{cmdstring ""}} {
                             }
                         }
                     }
-                    default { eputs "no such subcommand: $subcmd" }
+                    default { eputs "No such option: $subcmd" }
                 }
             }
             c       {
@@ -696,18 +707,14 @@ proc ::TagmaDebug::Prepare {} {
         exit
     }
 
-    # Start the program!
+    # Set argv for the script.
     set argv0 [lindex $argv 0]
     set argv [lrange $argv 1 end]
-
-    # Prompts
-    eputs $description
-    eputs "Type h to the prompt to get help."
     if {![file exists $argv0]} {
         set argv0 [auto_execok $argv0]
     }
 
-    # steps toplevel execution
+    # Set the trace on the top level procedure.
     variable step
     set step [Store $step __TagmaDebugMain]
     trace add execution __TagmaDebugMain enterstep ::TagmaDebug::Step
@@ -715,14 +722,49 @@ proc ::TagmaDebug::Prepare {} {
     # Always catch at the end of the program.
     trace add execution __TagmaDebugComplete enter ::TagmaDebug::Enter
 
+    eputs $description
+    eputs "Type h to the prompt to get help."
     eputs ""
     eputs "Debugging starts here:"
+}
+
+# unknown --
+#   Replacement for "unknown" to catch errors so the script does not exit.
+#
+# Arguments:
+#   args        Arguments normally passed to unknown.
+#
+# Result:
+#   None
+#
+# Side effect:
+#   Invokes the debugger if called and the real unknown throws an error.
+#   Prints details of the error, and args if verbose.
+rename unknown _original_unknown
+proc unknown {args} {
+    variable ::TagmaDebug::verbose
+    if {$::TagmaDebug::verbose} {
+        ::TagmaDebug::eputs "'unknown' has been invoked with: $args"
+    }
+
+    if {[catch {uplevel 1 [list _original_unknown {*}$args]} msg]} {
+        ::TagmaDebug::eputs "Error with 'unknown': $msg"
+        if {$::TagmaDebug::verbose} {
+            ::TagmaDebug::eputs "Args passed to 'unknown': $args"
+        }
+        ::TagmaDebug::debug
+    }
+
+    # Allow tracing of commands again.
+    variable ::TagmaDebug::debugInTagma
+    set ::TagmaDebug::debugInTagma 0
 }
 
 # __TagmaDebugMain --
 #   The main entry point for debugging.
 #   All activity from this procedure on is stepped over.
 #   Calling the script from here insures it is debugged.
+#   The uplevel call is skipped over bu the debugger.
 #
 # Arguments:
 #   None
