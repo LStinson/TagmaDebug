@@ -18,7 +18,85 @@ namespace eval ::TagmaDebug:: {
     variable prompt "Tagma> "
     variable description "TagmaDebug by Lorance Stinson AT Gmail..."
     variable verbose 0
+    variable debugInTagma 0
     variable entercontinues 1
+}
+
+# ::TagmaDebug::CheckCommand --
+#   Checks if a command exists.
+#
+# Arguments:
+#   command     The name of the command to check.
+#
+# Result:
+#   0 if the command does not exist.
+#   1 if the command is a procedure, command or function.
+#
+# Side effect:
+#   None
+proc ::TagmaDebug::CheckCommand {command} {
+    if {[uplevel 1 info procs $command] ne "" ||
+        [uplevel 1 info commands $command] ne "" ||
+        [uplevel 1 info functions $command] ne ""} {
+        return 1
+    }
+    return 0
+}
+
+# ::TagmaDebug::eputs --
+#   Prints a string to STDERR
+#
+# Arguments:
+#   string      The string to print
+#
+# Result:
+#   None
+#
+# Side effect:
+#   The string is printed to STDERR.
+proc ::TagmaDebug::eputs {string} {
+    puts stderr $string
+}
+
+# ::TagmaDebug::PrintVariable --
+#   Prints a variable and its value.
+#
+# Arguments:
+#   varname     The name of the variable to print.
+#
+# Result:
+#   None
+#
+# Side effect:
+#   The variable and value are printed.
+proc ::TagmaDebug::PrintVariable {varname} {
+    if {[uplevel 1 array exists $varname]} {
+        uplevel 1 parray $varname
+        return
+    }
+    if {[uplevel 1 info exists $varname]} {
+        eputs "$varname = [uplevel 1 set $varname]"
+    } else {
+        eputs "variable $varname does not exist"
+    }
+}
+
+# ::TagmaDebug::Store --
+#   Stores a value in a list if it is not already present.
+#
+# Arguments:
+#   list        The list to modify.
+#   elt         The value to store.
+#
+# Result:
+#   The modified, or original, list.
+#
+# Side effect:
+#   None
+proc ::TagmaDebug::Store {list elt} {
+    if {[lsearch -exact $list $elt] >= 0} {return $list}
+    lappend list $elt
+    return $list
 }
 
 # ::TagmaDebug::var --
@@ -51,7 +129,7 @@ proc ::TagmaDebug::var {name key} {
 #   Prints the information for the variable.
 #   Enters the debugger prompt.
 #   Disables logging if the variable was unset.
-#   Re-enables tracing on __TagmaDebugMain if it should be on.
+#   Re-enables command tracing.
 proc ::TagmaDebug::Break {name1 name2 op} {
     switch -- $op {
         read - write {
@@ -70,11 +148,9 @@ proc ::TagmaDebug::Break {name1 name2 op} {
     }
     uplevel 1 ::TagmaDebug::debug
 
-    # Turn tracing back on for __TagmaDebugMain, if it previously was.
-    variable step
-    if {[lsearch -exact $step "__TagmaDebugMain"] >= 0} {
-        trace add execution __TagmaDebugMain enterstep ::TagmaDebug::Step
-    }
+    # Allow tracing of commands again.
+    variable debugInTagma
+    set debugInTagma 0
 }
 
 # ::TagmaDebug::Unbreak --
@@ -111,7 +187,7 @@ proc ::TagmaDebug::Unbreak {name} {
 # Side effect:
 #   Prints the information for the variable.
 #   Disables logging if the variable was unset.
-#   Re-enables tracing on __TagmaDebugMain if it should be on.
+#   Re-enables command tracing.
 proc ::TagmaDebug::Log {name1 name2 op} {
     switch -- $op {
         read - write {
@@ -129,11 +205,9 @@ proc ::TagmaDebug::Log {name1 name2 op} {
         }
     }
 
-    # Turn tracing back on for __TagmaDebugMain, if it previously was.
-    variable step
-    if {[lsearch -exact $step "__TagmaDebugMain"] >= 0} {
-        trace add execution __TagmaDebugMain enterstep ::TagmaDebug::Step
-    }
+    # Allow tracing of commands again.
+    variable debugInTagma
+    set debugInTagma 0
 }
 
 # ::TagmaDebug::Unlog --
@@ -159,24 +233,6 @@ proc ::TagmaDebug::Unlog {name} {
     return 0
 }
 
-# ::TagmaDebug::Store --
-#   Stores a value in a list if it is not already present.
-#
-# Arguments:
-#   list        The list to modify.
-#   elt         The value to store.
-#
-# Result:
-#   The modified, or original, list.
-#
-# Side effect:
-#   None
-proc ::TagmaDebug::Store {list elt} {
-    if {[lsearch -exact $list $elt] >= 0} {return $list}
-    lappend list $elt
-    return $list
-}
-
 # ::TagmaDebug::Enter --
 #   Callback for command entry.
 #
@@ -189,7 +245,17 @@ proc ::TagmaDebug::Store {list elt} {
 # Side effect:
 #   prints when the command is entered.
 #   Enters the debugger prompt.
+#   Disables comand debugging if we venture into TagmaDebug.
 proc ::TagmaDebug::Enter {cmdstring op} {
+    variable debugInTagma
+    if {$debugInTagma} { return }
+
+    if {[string range $cmdstring 0 13] eq "::TagmaDebug::"} {
+        # Disable tracing for commands.
+        set debugInTagma 1
+        return
+    }
+
     switch -- $op {
         enter {
             eputs "Entering: [lindex $cmdstring 0]"
@@ -240,7 +306,17 @@ proc ::TagmaDebug::Unenter {name} {
 # Side effect:
 #   prints when the command is left.
 #   Enters the debugger prompt.
+#   Disables comand debugging if we venture into TagmaDebug.
 proc ::TagmaDebug::Leave {cmdstring code result op} {
+    variable debugInTagma
+    if {$debugInTagma} { return }
+
+    if {[string range $cmdstring 0 13] eq "::TagmaDebug::"} {
+        # Disable tracing for commands.
+        set debugInTagma 1
+        return
+    }
+
     switch -- $op {
         leave {
             eputs "Leaving: [lindex $cmdstring 0]"
@@ -282,6 +358,9 @@ proc ::TagmaDebug::Unleave {name} {
 
 # ::TagmaDebug::Step --
 #   Callback for command step.
+#   This is really named _Step because the first step isn't real.
+#   So to skip that step a fake Step is called for the first one
+#   then renames this step to Step.
 #
 # Arguments:
 #   From the trace command.
@@ -293,13 +372,14 @@ proc ::TagmaDebug::Unleave {name} {
 #   Disables the step trace on __TagmaDebugMain if entering Log or Break.
 #   (This is to not step into the debugger.)
 #   Prints the command that is about to be executed
-#   Enters the debugger prompt.
-proc ::TagmaDebug::Step {cmdstring op} {
-    if {[string range $cmdstring 0 16] eq "::TagmaDebug::Log" ||
-        [string range $cmdstring 0 18] eq "::TagmaDebug::Break"} {
-        # Disable tracing on __TagmaDebugMain.
-        # Don't want to trace variable breakpoints...
-        trace remove execution __TagmaDebugMain enterstep ::TagmaDebug::Step
+#   Disables comand debugging if we venture into TagmaDebug.
+proc ::TagmaDebug::_Step {cmdstring op} {
+    variable debugInTagma
+    if {$debugInTagma} { return }
+
+    if {[string range $cmdstring 0 13] eq "::TagmaDebug::"} {
+        # Disable tracing for commands.
+        set debugInTagma 1
         return
     }
 
@@ -312,6 +392,25 @@ proc ::TagmaDebug::Step {cmdstring op} {
         }
     }
     uplevel 1 ::TagmaDebug::debug [list $cmdstring]
+}
+
+# ::TagmaDebug::__Step --
+#   Fake Step to hide the first step.
+#   This step is really the uplevel call to start debugging.
+#   There is no need to see that.
+#
+# Arguments:
+#   From the trace command.
+#
+# Result:
+#   None
+#
+# Side effect:
+#   Renames Step to __Step.
+#   Renames _Step to Step.
+proc ::TagmaDebug::Step {cmdstring op} {
+    rename ::TagmaDebug::Step ::TagmaDebug::__Step
+    rename ::TagmaDebug::_Step ::TagmaDebug::Step
 }
 
 # ::TagmaDebug::Unstep --
@@ -333,65 +432,6 @@ proc ::TagmaDebug::Unstep {name} {
     set step [lreplace $step $i $i]
     catch {
         trace remove execution $name enterstep ::TagmaDebug::Step
-    }
-    return 0
-}
-
-# ::TagmaDebug::eputs --
-#   Prints a string to STDERR
-#
-# Arguments:
-#   string      The string to print
-#
-# Result:
-#   None
-#
-# Side effect:
-#   The string is printed to STDERR.
-proc ::TagmaDebug::eputs {string} {
-    puts stderr $string
-}
-
-# ::TagmaDebug::PrintVariable --
-#   Prints a variable and its value.
-#
-# Arguments:
-#   varname     The name of the variable to print.
-#
-# Result:
-#   None
-#
-# Side effect:
-#   The variable and value are printed.
-proc ::TagmaDebug::PrintVariable {varname} {
-    if {[uplevel 1 array exists $varname]} {
-        uplevel 1 parray $varname
-        return
-    }
-    if {[uplevel 1 info exists $varname]} {
-        eputs "$varname = [uplevel 1 set $varname]"
-    } else {
-        eputs "variable $varname does not exist"
-    }
-}
-
-# ::TagmaDebug::CheckCommand --
-#   Checks if a command exists.
-#
-# Arguments:
-#   command     The name of the command to check.
-#
-# Result:
-#   0 if the command does not exist.
-#   1 if the command is a procedure, command or function.
-#
-# Side effect:
-#   None
-proc ::TagmaDebug::CheckCommand {command} {
-    if {[uplevel 1 info procs $command] ne "" ||
-        [uplevel 1 info commands $command] ne "" ||
-        [uplevel 1 info functions $command] ne ""} {
-        return 1
     }
     return 0
 }
@@ -630,7 +670,7 @@ proc ::TagmaDebug::debug {{cmdstring ""}} {
     }
 }
 
-# ::TagmaDebug::prepare --
+# ::TagmaDebug::Prepare --
 #   Prepares for debugging.
 #
 # Arguments:
@@ -643,7 +683,7 @@ proc ::TagmaDebug::debug {{cmdstring ""}} {
 #   Enables tracing on __TagmaDebugMain.
 #   Enables tracing on __TagmaDebugComplete, but does not store it in a list.
 #   Informs the user debugging is starting.
-proc ::TagmaDebug::prepare {} {
+proc ::TagmaDebug::Prepare {} {
     global argv argv0
     variable description
 
@@ -713,6 +753,6 @@ proc __TagmaDebugComplete {} {
 }
 
 # Prepare and go!
-::TagmaDebug::prepare
+::TagmaDebug::Prepare
 __TagmaDebugMain
 __TagmaDebugComplete
