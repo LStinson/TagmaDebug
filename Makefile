@@ -69,11 +69,11 @@ dist: $(DOCS)
 
 # Generate the manual file.
 man: $(POD)
-	pod2man $(POD) > $(MAN)
+	pod2man $(POD) $(MAN)
 
 # Generate the README file.
 readme:	$(POD)
-	pod2text $(POD) > $(README)
+	pod2text $(POD) $(README)
 
 $(MAN): man
 

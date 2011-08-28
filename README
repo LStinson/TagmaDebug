@@ -86,10 +86,3 @@ COPYRIGHT
 AUTHOR
     Written by Lorance Stinson AT Gmail....
 
-POD ERRORS
-    Hey! The above document had some coding errors, which are explained
-    below:
-
-    Around line 113:
-        You forgot a '=back' before '=head1'
-

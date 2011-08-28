@@ -108,7 +108,7 @@ Toggle verbosity. Print extra info, when available.
 
 Exit the debugger. Ctrl-D should also have the same effect.
 
-=cut
+=back
 
 =head1 PORTABILITY
 
