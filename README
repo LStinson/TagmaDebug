@@ -17,6 +17,10 @@ DESCRIPTION
     is a hidden enter trace on this procedure to ensure the user gets the
     debugger prompt one last time.
 
+    The unknown command is replaced and the original called. If the original
+    unknown throws an error it is caught. The error message is displayed and
+    the debugger is entered.
+
     All output from the debugger is written to stderr. This allows for
     redirection of the program or debugger output if desired.
 
@@ -76,6 +80,8 @@ INSTALLATION
 
 HOME
     <https://github.com/LStinson/TagmaDebug>
+
+    <http://wiki.tcl.tk/28695>
 
 COPYRIGHT
     This script is derived from "TclDebugger by S.Arnold. v0.1 2007-09-09" -

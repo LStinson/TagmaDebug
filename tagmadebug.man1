@@ -124,7 +124,7 @@
 .\" ========================================================================
 .\"
 .IX Title "MAN 1"
-.TH MAN 1 "2011-08-27" "perl v5.10.1" "User Contributed Perl Documentation"
+.TH MAN 1 "2011-08-28" "perl v5.10.1" "User Contributed Perl Documentation"
 .\" For nroff, turn off justification.  Always turn off hyphenation; it makes
 .\" way too many mistakes in technical documents.
 .if n .ad l
@@ -147,6 +147,10 @@ procedure basically causes a break on every command. Once the script completes
 the procedure \*(R"\fB_\|_TagmaDebugComplete\fR" is called. There is a hidden enter
 trace on this procedure to ensure the user gets the debugger prompt one last
 time.
+.PP
+The \fBunknown\fR command is replaced and the original called. If the original
+unknown throws an error it is caught. The error message is displayed and the
+debugger is entered.
 .PP
 All output from the debugger is written to \fBstderr\fR. This allows for
 redirection of the program or debugger output if desired.
@@ -223,6 +227,8 @@ Either copy \fItagmadebug.tcl\fR where you want it or run \*(L"make install\*(R"
 .SH "HOME"
 .IX Header "HOME"
 <https://github.com/LStinson/TagmaDebug>
+.PP
+<http://wiki.tcl.tk/28695>
 .SH "COPYRIGHT"
 .IX Header "COPYRIGHT"
 This script is derived from \*(L"TclDebugger by S.Arnold. v0.1 2007\-09\-09\*(R" \-
