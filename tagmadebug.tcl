@@ -51,6 +51,7 @@ proc ::TagmaDebug::var {name key} {
 #   Prints the information for the variable.
 #   Enters the debugger prompt.
 #   Disables logging if the variable was unset.
+#   Re-enables tracing on __TagmaDebugMain if it should be on.
 proc ::TagmaDebug::Break {name1 name2 op} {
     switch -- $op {
         read - write {
@@ -68,6 +69,12 @@ proc ::TagmaDebug::Break {name1 name2 op} {
         }
     }
     uplevel 1 ::TagmaDebug::debug
+
+    # Turn tracing back on for ::TagmaDebug::__TagmaDebugMain, if it previously was.
+    variable step
+    if {[lsearch -exact $step "::TagmaDebug::__TagmaDebugMain"] >= 0} {
+        trace add execution ::TagmaDebug::__TagmaDebugMain enterstep ::TagmaDebug::Step
+    }
 }
 
 # ::TagmaDebug::Unbreak --
@@ -283,13 +290,15 @@ proc ::TagmaDebug::Unleave {name} {
 #   None
 #
 # Side effect:
-#   Disables the step trace on __TagmaDebugMain if entering Log.
+#   Disables the step trace on __TagmaDebugMain if entering Log or Break.
 #   (This is to not step into the debugger.)
 #   Prints the command that is about to be executed
 #   Enters the debugger prompt.
 proc ::TagmaDebug::Step {cmdstring op} {
-    if {[string range $cmdstring 0 14] eq "::TagmaDebug::Log"} {
-        # Disable tracing on ::TagmaDebug::__TagmaDebugMain so we don't trace Log.
+    if {[string range $cmdstring 0 14] eq "::TagmaDebug::Log" ||
+        [string range $cmdstring 0 18] eq "::TagmaDebug::Break"} {
+        # Disable tracing on ::TagmaDebug::__TagmaDebugMain.
+        # Don't want to trace variable breakpoints...
         trace remove execution ::TagmaDebug::__TagmaDebugMain enterstep ::TagmaDebug::Step
         return
     }
