@@ -226,7 +226,7 @@ Either copy \fItagmadebug.tcl\fR where you want it or run \*(L"make install\*(R"
 .SH "COPYRIGHT"
 .IX Header "COPYRIGHT"
 This script is derived from \*(L"TclDebugger by S.Arnold. v0.1 2007\-09\-09\*(R" \-
-<<http://wiki.tcl.tk/19872>>. What ever copyright he says his code is
+<http://wiki.tcl.tk/19872>. What ever copyright he says his code is
 under is what applies to this one. Since it was listed publicly with no
 restrictions I am assuming it is free to modify.
 .SH "AUTHOR"

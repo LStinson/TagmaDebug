@@ -126,7 +126,7 @@ L<https://github.com/LStinson/TagmaDebug>
 =head1 COPYRIGHT
 
 This script is derived from "TclDebugger by S.Arnold. v0.1 2007-09-09" -
-E<lt>L<http://wiki.tcl.tk/19872>E<gt>. What ever copyright he says his code is
+L<http://wiki.tcl.tk/19872>. What ever copyright he says his code is
 under is what applies to this one. Since it was listed publicly with no
 restrictions I am assuming it is free to modify.
 
