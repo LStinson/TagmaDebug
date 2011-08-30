@@ -124,7 +124,7 @@
 .\" ========================================================================
 .\"
 .IX Title "MAN 1"
-.TH MAN 1 "2011-08-28" "perl v5.10.1" "User Contributed Perl Documentation"
+.TH MAN 1 "2011-08-29" "perl v5.10.1" "User Contributed Perl Documentation"
 .\" For nroff, turn off justification.  Always turn off hyphenation; it makes
 .\" way too many mistakes in technical documents.
 .if n .ad l
@@ -154,29 +154,44 @@ debugger is entered.
 .PP
 All output from the debugger is written to \fBstderr\fR. This allows for
 redirection of the program or debugger output if desired.
+.SH "PROMPT"
+.IX Header "PROMPT"
+The prompt is composed of flags in curly brackets '{}', the level of
+execution, the procedure (if one is executing) and the name of the program.
+.PP
+The flags indicate when certain features are enabled.  'E' indicates enter
+will continue a step, the same as typing 'c Enter'. 'V' indicates verbose mode
+is enabled.  This will cause additional output in certain places.
+.PP
+Sample prompt: {E}(1 => foo)Tagma>
+.PP
+This prompt indicates Enter will continue a step and execution is one level
+deep in the procedure \*(L"foo\*(R".
 .SH "COMMANDS"
 .IX Header "COMMANDS"
 There are a few interactive commands that control the debugger. There is no
 line editing and very little nicety.
-.IP "\fBh\fR or \fB?\fR" 12
-.IX Item "h or ?"
-Prints the help text.
-.IP "\fBa\fR or \fB>\fR" 12
-.IX Item "a or >"
-Prints the command being executed.
-.IP "\fBp\fR" 12
-.IX Item "p"
-Prints the current level & procedure. When at the top level '::' is printed
-for the procedure.
-.IP "\fBe\fR or \fB[..]\fR" 12
-.IX Item "e or [..]"
-Evaluates \s-1TCL\s0 code. When using \fB[..]\fR The closing ']' is required.
 .IP "\fB!\fR" 12
 .IX Item "!"
 Executes a shell command.
 .IP "\fB=\fR" 12
 .IX Item "="
-Prints the content of each variable name proided.
+Prints the content of each variable name provided.
+.IP "\fBa\fR or \fB>\fR" 12
+.IX Item "a or >"
+Prints the command being executed.
+.IP "\fBc\fR or Enter" 12
+.IX Item "c or Enter"
+Continue execution.
+.IP "\fBE\fR" 12
+.IX Item "E"
+Toggle Enter acting as a shortcut to 'c Enter'.
+.IP "\fBe\fR or \fB[..]\fR" 12
+.IX Item "e or [..]"
+Evaluates \s-1TCL\s0 code. When using \fB[..]\fR The closing ']' is required.
+.IP "\fBh\fR or \fB?\fR" 12
+.IX Item "h or ?"
+Prints the help text.
 .IP "\fBvar log\fR" 12
 .IX Item "var log"
 Logs all modifications of a variable to stderr.
@@ -204,15 +219,15 @@ is a breakpoint.
 .IX Item "cmd clear"
 Clear break points. Passes the command to [string match ...] so globbing can
 be used.
-.IP "\fBc\fR or Enter" 12
-.IX Item "c or Enter"
-Continue execution. Change the variable \*(L"entercontinues\*(R" at the top of the
-script to \*(L"0\*(R" to disable Enter acting as continue.
+.IP "\fBp\fR" 12
+.IX Item "p"
+Prints the current level & procedure. When at the top level '::' is printed
+for the procedure.
 .IP "\fBr\fR" 12
 .IX Item "r"
 Restarts the program.
-.IP "\fBv\fR" 12
-.IX Item "v"
+.IP "\fBV\fR" 12
+.IX Item "V"
 Toggle verbosity. Print extra info, when available.
 .IP "\fBx\fR or \fBq\fR" 12
 .IX Item "x or q"

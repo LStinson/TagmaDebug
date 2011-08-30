@@ -20,7 +20,7 @@ namespace eval ::TagmaDebug:: {
     variable description "TagmaDebug by Lorance Stinson AT Gmail..."
     variable verbose 0
     variable debugInTagma 0
-    variable entercontinues 1
+    variable entercont 1
 }
 
 # ::TagmaDebug::CheckCommand --
@@ -462,12 +462,13 @@ proc ::TagmaDebug::PrintHelp {} {
     eputs description
     eputs [join {
         "Commands are:"
-        "    h or ?      Prints this message."
-        "    a or >      Prints the command being executed."
-        "    p           Prints the current level & procedure."
-        "    e or \[..\]   Evaluates a command."
         "    !           Execute a shell command."
-        "    =           Prints the content of each variable name."
+        "    =           Prints the content of each variable name provided."
+        "    a or >      Prints the command being executed."
+        "    c or Enter  Continue execution."
+        "    h or ?      Prints this message."
+        "    E           Toggle Enter acting as a shortcut to 'c Enter'."
+        "    e or \[..\]   Evaluates a command."
         "    var         Watchs the modifications of some variables."
         "        log     Logs all modifications to stderr."
         "        break   Adds breakpoint for writes."
@@ -479,9 +480,9 @@ proc ::TagmaDebug::PrintHelp {} {
         "        info    Prints all commands being watched.."
         "        step    Steps through the command."
         "        clear   Clear break points (using glob patterns)."
-        "    c or Enter  Continue execution."
+        "    p           Prints the current level & procedure."
         "    r           Restarts the program."
-        "    v           Toggle verbosity. (Print extra info, when available.)"
+        "    V           Toggle verbosity. (Print extra info, when available.)"
         "    x or q      Exit the debugger."
         "Based on TclDebugger by S.Arnold. v0.1 2007-09-09 http://wiki.tcl.tk/19872"
         } "\n"]
@@ -501,20 +502,29 @@ proc ::TagmaDebug::PrintHelp {} {
 #   Manipulates tracing and the lists.
 proc ::TagmaDebug::debug {{cmdstring ""}} {
     while 1 {
-        variable entercontinues
+        variable entercont
         variable prompt
         variable verbose
 
+        # Build the prompt details.
+        set flags [expr {$entercont ? "E" : ""}]
+        append flags [expr {$verbose ? "V" : ""}]
+        set level [uplevel 1 info level]
+        set command ""
+        if {$level > 0} {
+            set command " => [lindex [uplevel 1 info level 0] 0]"
+        }
+
         # Prompt and wait for input.
-        set flag [expr {$verbose ? "{V}" : ""}]
-        puts -nonewline stderr "$flag$prompt"
+        #puts -nonewline stderr "{$flags}$prompt"
+        puts -nonewline stderr "{$flags}($level$command)$prompt"
         flush stderr
 
         if {[gets stdin line] < 0} {
             puts ""
             exit
         } elseif {$line eq ""} {
-            if {$entercontinues} {
+            if {$entercont} {
                 return
             } else {
                 continue
@@ -531,21 +541,30 @@ proc ::TagmaDebug::debug {{cmdstring ""}} {
 
         set command [lindex $line 0]
         switch -- $command {
-            h - ?   {
-                PrintHelp
+            !       {
+                if {[catch {eputs [exec -ignorestderr -- [lrange $line 1 end]]} msg]} {
+                    eputs "Error: $msg"
+                }
+            }
+            =       {
+                foreach var [lrange $line 1 end] {uplevel 1 ::TagmaDebug::PrintVariable $var}
+            }
+            a - >   {
+                eputs $cmdstring
+            }
+            c       {
+                return
+            }
+            E       {
+                set entercont [expr {!$entercont}]
             }
             e       {
                 if {[catch {eputs [uplevel 1 [lrange $line 1 end]]} msg]} {
                     eputs "Error: $msg"
                 }
             }
-            ! {
-                if {[catch {eputs [exec -ignorestderr -- [lrange $line 1 end]]} msg]} {
-                    eputs "Error: $msg"
-                }
-            }
-            a - >   {
-                eputs $cmdstring
+            h - ?   {
+                PrintHelp
             }
             p       {
                 set command "::"
@@ -554,9 +573,6 @@ proc ::TagmaDebug::debug {{cmdstring ""}} {
                     set command [uplevel 1 info level 0]
                 }
                 eputs "($level) $command"
-            }
-            =       {
-                foreach var [lrange $line 1 end] {uplevel 1 ::TagmaDebug::PrintVariable $var}
             }
             var     {
                 if {[llength $line] < 2 || [llength $line] > 3} {
@@ -660,17 +676,15 @@ proc ::TagmaDebug::debug {{cmdstring ""}} {
                     default { eputs "No such option: $subcmd" }
                 }
             }
-            c       {
-                return
-            }
             r       {
                 variable argv0
                 variable argv
                 eval exec [list [info nameofexecutable] $argv0] $argv
                 exit
             }
-            v       {
-                set verbose [expr {!$verbose}] }
+            V       {
+                set verbose [expr {!$verbose}]
+            }
             x - q   {
                 exit
             }

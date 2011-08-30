@@ -24,23 +24,39 @@ DESCRIPTION
     All output from the debugger is written to stderr. This allows for
     redirection of the program or debugger output if desired.
 
+PROMPT
+    The prompt is composed of flags in curly brackets '{}', the level of
+    execution, the procedure (if one is executing) and the name of the
+    program.
+
+    The flags indicate when certain features are enabled. 'E' indicates
+    enter will continue a step, the same as typing 'c Enter'. 'V' indicates
+    verbose mode is enabled. This will cause additional output in certain
+    places.
+
+    Sample prompt: {E}(1 => foo)Tagma>
+
+    This prompt indicates Enter will continue a step and execution is one
+    level deep in the procedure "foo".
+
 COMMANDS
     There are a few interactive commands that control the debugger. There is
     no line editing and very little nicety.
 
-    h or ?      Prints the help text.
+    !           Executes a shell command.
+
+    =           Prints the content of each variable name provided.
 
     a or >      Prints the command being executed.
 
-    p           Prints the current level & procedure. When at the top level
-                '::' is printed for the procedure.
+    c or Enter  Continue execution.
+
+    E           Toggle Enter acting as a shortcut to 'c Enter'.
 
     e or [..]   Evaluates TCL code. When using [..] The closing ']' is
                 required.
 
-    !           Executes a shell command.
-
-    =           Prints the content of each variable name proided.
+    h or ?      Prints the help text.
 
     var log     Logs all modifications of a variable to stderr.
 
@@ -61,13 +77,12 @@ COMMANDS
     cmd clear   Clear break points. Passes the command to [string match ...]
                 so globbing can be used.
 
-    c or Enter  Continue execution. Change the variable "entercontinues" at
-                the top of the script to "0" to disable Enter acting as
-                continue.
+    p           Prints the current level & procedure. When at the top level
+                '::' is printed for the procedure.
 
     r           Restarts the program.
 
-    v           Toggle verbosity. Print extra info, when available.
+    V           Toggle verbosity. Print extra info, when available.
 
     x or q      Exit the debugger. Ctrl-D should also have the same effect.
 
