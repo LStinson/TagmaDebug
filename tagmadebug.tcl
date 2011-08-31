@@ -67,9 +67,7 @@ proc ::TagmaDebug::eputs {args} {
         set args [lrange $args 1 end]
     }
 
-    foreach arg $args {
-        append string $arg
-    }
+    append string [join $args " "] 
 
     puts stderr $string
 }
