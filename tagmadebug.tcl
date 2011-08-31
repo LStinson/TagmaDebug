@@ -48,28 +48,48 @@ proc ::TagmaDebug::CheckCommand {command} {
 }
 
 # ::TagmaDebug::eputs --
-#   Prints a string to STDERR
+#   Prints strings to STDERR.
+#   Each string is printed on a separate line.
+#
+# Options
+#   -prefix     Prefix each string with the prefix from settings.
+#   -list       Treat the first argument as a list and pring each element.
+#   --          End processing of options.
 #
 # Arguments:
-#   -prefix     If specified prints the prefix from settings.
-#   string      The string to print.
+#   args        Strings to print.
 #
 # Result:
 #   None
 #
 # Side effect:
-#   The string is printed to STDERR.
+#   The strings are printed to STDERR.
 proc ::TagmaDebug::eputs {args} {
-    set string ""
-    if {[llength $args] > 1 && [lindex $args 0] == "-prefix"} {
-        variable settings
-        append string "$settings(prefix) "
-        set args [lrange $args 1 end]
+    variable settings
+    set prefix ""
+    set list 0
+    set count 0
+    foreach arg $args {
+        switch -nocase -- $arg {
+            -- {
+                incr count
+                break
+            }
+            -prefix {
+                incr count
+                append prefix "$settings(prefix) "
+            }
+            -list {
+                incr count
+                set list 1
+            }
+            default { break }
+        }
     }
 
-    append string [join $args " "] 
-
-    puts stderr $string
+    foreach arg [expr {$list ? [lindex $args $count] : [lrange $args $count end]}] {
+        puts stderr "$prefix$arg"
+    }
 }
 
 # ::TagmaDebug::PrintVariable --
@@ -109,8 +129,7 @@ proc ::TagmaDebug::PrintVariable {varname} {
 #   None
 proc ::TagmaDebug::Store {list elt} {
     if {[lsearch -exact $list $elt] >= 0} {return $list}
-    lappend list $elt
-    return $list
+    return [lappend list $elt]
 }
 
 # ::TagmaDebug::var --
@@ -400,9 +419,7 @@ proc ::TagmaDebug::_Step {cmdstring op} {
 
     switch -- $op {
         enterstep {
-            foreach line [split $cmdstring "\n\r"] {
-                eputs -prefix "$line"
-            }
+            eputs -prefix -list -- [split $cmdstring "\n\r"]
         }
         default {
             error "Step: Unknown OP '$op' for '$cmdstring'."
@@ -466,7 +483,7 @@ proc ::TagmaDebug::Unstep {name} {
 proc ::TagmaDebug::PrintHelp {} {
     variable settings
     eputs $settings(descr)
-    eputs [join {
+    eputs -list -- {
         "Commands are:"
         "    !           Execute a shell command."
         "    =           Prints the content of each variable name provided."
@@ -491,7 +508,7 @@ proc ::TagmaDebug::PrintHelp {} {
         "    V           Toggle verbosity. (Print extra info, when available.)"
         "    x or q      Exit the debugger."
         "Based on TclDebugger by S.Arnold. v0.1 2007-09-09 http://wiki.tcl.tk/19872"
-        } "\n"]
+        }
 }
 
 # ::TagmaDebug::debug --
@@ -598,7 +615,7 @@ proc ::TagmaDebug::debug {{cmdstring ""}} {
                         foreach {n t} {log Logged break "Breaks at"} {
                             variable $n
                             eputs "=== $t: ==="
-                            eputs [set $n]
+                            eputs [lsort [set $n]]
                             eputs "----"
                         }
                     }
@@ -659,7 +676,7 @@ proc ::TagmaDebug::debug {{cmdstring ""}} {
                         foreach {n t} {enter Enters leave Leaves step Stepping} {
                             variable $n
                             eputs "=== $t: ==="
-                            eputs [set $n]
+                            eputs [lsort [set $n]]
                             eputs "----"
                         }
                     }
