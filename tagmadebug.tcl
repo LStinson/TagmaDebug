@@ -567,7 +567,9 @@ proc ::TagmaDebug::debug {{cmdstring ""}} {
                 }
             }
             =       {
-                foreach var [lrange $line 1 end] {uplevel 1 ::TagmaDebug::PrintVariable $var}
+                foreach var [lrange $line 1 end] {
+                    uplevel 1 ::TagmaDebug::PrintVariable $var
+                }
             }
             a - >   {
                 eputs $cmdstring
@@ -681,7 +683,9 @@ proc ::TagmaDebug::debug {{cmdstring ""}} {
                         }
                     }
                     clear   {
-                        foreach {v t cmd} {enter Enters Unenter leave Leaves Unleave step Stepping Unstep} {
+                        foreach {v t cmd} {enter Enters   Unenter
+                                           leave Leaves   Unleave
+                                           step  Stepping Unstep} {
                             eputs "clearing $t..."
                             variable $v
                             foreach i [set $v] {
