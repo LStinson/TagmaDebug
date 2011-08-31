@@ -19,7 +19,7 @@ DESCRIPTION
 
     The unknown command is replaced and the original called. If the original
     unknown throws an error it is caught. The error message is displayed and
-    the debugger is entered.
+    the debugger is entered. The debugger will not step into unknown.
 
     All output from the debugger is written to stderr. This allows for
     redirection of the program or debugger output if desired.
