@@ -1,4 +1,4 @@
-NAME
+  NAME
     TagmaDebug - Interactive TCL Debugger
 
 SYNOPSIS
@@ -19,10 +19,12 @@ DESCRIPTION
 
     The unknown command is replaced and the original called. If the original
     unknown throws an error it is caught. The error message is displayed and
-    the debugger is entered. The debugger will not step into unknown.
+    the debugger is entered.
 
     All output from the debugger is written to stderr. This allows for
     redirection of the program or debugger output if desired.
+
+    The debugger will not step into unknown.
 
 PROMPT
     The prompt is composed of flags in curly brackets '{}', the level of
@@ -50,8 +52,6 @@ COMMANDS
     a or >      Prints the command being executed.
 
     c or Enter  Continue execution.
-
-    E           Toggle Enter acting as a shortcut to 'c Enter'.
 
     e or [..]   Evaluates TCL code. When using [..] The closing ']' is
                 required.
@@ -82,9 +82,19 @@ COMMANDS
 
     r           Restarts the program.
 
-    V           Toggle verbosity. Print extra info, when available.
-
     x or q      Exit the debugger. Ctrl-D should also have the same effect.
+
+SETTINGS
+    Settings to control TagmaDebug. These are reflected by the flags inside
+    {} in the prompt. The flags and settings use the same letter.
+
+    B       Toggle printing the body of procedures when they are defined.
+
+    E       Toggle Enter acting as a shortcut to 'c Enter'.
+
+    P       Toggle stepping into package.
+
+    V       Toggle verbosity. Print extra info, when available.
 
 PORTABILITY
     TagmaDebug should work with any TCL version 8.4 or later. Testing has

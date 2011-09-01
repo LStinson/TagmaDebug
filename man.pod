@@ -1,4 +1,4 @@
-=head1 NAME
+=head2 NAME
 
 TagmaDebug - Interactive TCL Debugger
 
@@ -23,10 +23,12 @@ time.
 
 The B<unknown> command is replaced and the original called. If the original
 unknown throws an error it is caught. The error message is displayed and the
-debugger is entered. The debugger will not step into unknown.
+debugger is entered.
 
 All output from the debugger is written to B<stderr>. This allows for
 redirection of the program or debugger output if desired.
+
+The debugger will not step into unknown.
 
 =head1 PROMPT
 
@@ -64,10 +66,6 @@ Prints the command being executed.
 =item B<c> or Enter
 
 Continue execution.
-
-=item B<E>
-
-Toggle Enter acting as a shortcut to 'c Enter'.
 
 =item B<e> or B<[..]>
 
@@ -121,13 +119,34 @@ for the procedure.
 
 Restarts the program.
 
-=item B<V>
-
-Toggle verbosity. Print extra info, when available.
-
 =item B<x> or B<q>
 
 Exit the debugger. Ctrl-D should also have the same effect.
+
+=back
+
+=head1 SETTINGS
+
+Settings to control TagmaDebug. These are reflected by the flags inside B<{}>
+in the prompt. The flags and settings use the same letter.
+
+=over 8
+
+=item B<B>
+
+Toggle printing the body of procedures when they are defined.
+
+=item B<E>
+
+Toggle Enter acting as a shortcut to 'c Enter'.
+
+=item B<P>
+
+Toggle stepping into package.
+
+=item B<V>
+
+Toggle verbosity. Print extra info, when available.
 
 =back
 

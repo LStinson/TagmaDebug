@@ -10,16 +10,20 @@
 namespace eval ::TagmaDebug:: {
     variable argv $::argv
     variable argv0 $::argv0
-    variable break ""
-    variable log ""
-    variable enter ""
-    variable leave ""
-    variable step ""
-    variable debugInTagma 0
+    variable break  {}
+    variable enter  {}
+    variable leave  {}
+    variable log    {}
+    variable procs  {}
+    variable step   {}
+    variable debugDisabled 0
+    variable debugDisabledCmd ""
     variable settings
     array set settings {
+        body        1
         descr       "TagmaDebug by Lorance Stinson AT Gmail..."
         enter       1
+        packages    0
         prefix      ">>"
         prompt      "Tagma> "
         verbose     0
@@ -162,7 +166,7 @@ proc ::TagmaDebug::var {name key} {
 #   Prints the information for the variable.
 #   Enters the debugger prompt.
 #   Disables logging if the variable was unset.
-#   Re-enables command tracing.
+#   Re-enables debuggin.
 proc ::TagmaDebug::Break {name1 name2 op} {
     switch -- $op {
         read - write {
@@ -181,9 +185,9 @@ proc ::TagmaDebug::Break {name1 name2 op} {
     }
     uplevel 1 ::TagmaDebug::debug
 
-    # Allow tracing of commands again.
-    variable debugInTagma
-    set debugInTagma 0
+    # Re-enable debugging.
+    variable debugDisabled
+    if {$debugDisabled > 0} {set debugDisabled 0}
 }
 
 # ::TagmaDebug::Unbreak --
@@ -220,7 +224,7 @@ proc ::TagmaDebug::Unbreak {name} {
 # Side effect:
 #   Prints the information for the variable.
 #   Disables logging if the variable was unset.
-#   Re-enables command tracing.
+#   Re-enables debugging.
 proc ::TagmaDebug::Log {name1 name2 op} {
     switch -- $op {
         read - write {
@@ -238,9 +242,9 @@ proc ::TagmaDebug::Log {name1 name2 op} {
         }
     }
 
-    # Allow tracing of commands again.
-    variable debugInTagma
-    set debugInTagma 0
+    # Re-enable debugging.
+    variable debugDisabled
+    if {$debugDisabled > 0} {set debugDisabled 0}
 }
 
 # ::TagmaDebug::Unlog --
@@ -278,14 +282,14 @@ proc ::TagmaDebug::Unlog {name} {
 # Side effect:
 #   prints when the command is entered.
 #   Enters the debugger prompt.
-#   Disables comand debugging if we venture into TagmaDebug.
+#   Disables debugging upon entering TagmaDebug.
 proc ::TagmaDebug::Enter {cmdstring op} {
-    variable debugInTagma
-    if {$debugInTagma} { return }
+    variable debugDisabled
+    if {$debugDisabled} { return }
 
     if {[string range $cmdstring 0 13] eq "::TagmaDebug::"} {
-        # Disable tracing for commands.
-        set debugInTagma 1
+        # Disable debuggin.
+        set debugDisabled 1
         return
     }
 
@@ -339,14 +343,14 @@ proc ::TagmaDebug::Unenter {name} {
 # Side effect:
 #   prints when the command is left.
 #   Enters the debugger prompt.
-#   Disables comand debugging if we venture into TagmaDebug.
+#   Disables debugging upon entering TagmaDebug.
 proc ::TagmaDebug::Leave {cmdstring code result op} {
-    variable debugInTagma
-    if {$debugInTagma} { return }
+    variable debugDisabled
+    if {$debugDisabled} { return }
 
     if {[string range $cmdstring 0 13] eq "::TagmaDebug::"} {
-        # Disable tracing for commands.
-        set debugInTagma 1
+        # Disable debugging
+        set debugDisabled 1
         return
     }
 
@@ -402,19 +406,42 @@ proc ::TagmaDebug::Unleave {name} {
 #   None
 #
 # Side effect:
-#   Disables the step trace on __TagmaDebugMain if entering Log or Break.
-#   (This is to not step into the debugger.)
 #   Prints the command that is about to be executed
-#   Disables comand debugging if we venture into TagmaDebug.
+#   Disables debugging upon entering TagmaDebug.
 proc ::TagmaDebug::_Step {cmdstring op} {
-    variable debugInTagma
-    if {$debugInTagma} { return }
+    variable debugDisabled
+    if {$debugDisabled} { return }
 
-    if {[string range $cmdstring 0 13] eq "::TagmaDebug::" ||
-        [string match "::unknown *" $cmdstring]} {
-        # Disable tracing for commands.
-        set debugInTagma 1
-        return
+    # Disable debugging for certain commands.
+    switch -glob -- $cmdstring {
+        ::TagmaDebug::* {
+            # Disable for the debugger its self.
+            set debugDisabled 1
+            return
+        }
+        "proc *" {
+            # Disable debug, but show the user it was called.
+            set debugDisabled 1
+            variable settings
+            if {!$settings(body)} {
+                set cmdstring [lrange $cmdstring 0 end-1]
+            }
+        }
+        "::unknown *" {
+            # Disable debug, but show the user it was called.
+            set debugDisabled 1
+        }
+        "package *" {
+            variable settings
+            if {!$settings(packages)} {
+                # Disable debug, but show the user it was called.
+                # Will not be re-enabled till after the command exits.
+                # See EnableDebug for more information.
+                variable debugDisabledCmd
+                set debugDisabled -1
+                set debugDisabledCmd $cmdstring
+            }
+        }
     }
 
     switch -- $op {
@@ -470,6 +497,32 @@ proc ::TagmaDebug::Unstep {name} {
     return 0
 }
 
+# ::TagmaDebug::EnableDebug--
+#   Callback to re-enable debugging.
+#   Add as a leave callback and debugging will be turned back on.
+#
+# Arguments:
+#   From the trace command.
+#
+# Result:
+#   None
+#
+# Side effect:
+#   Prints the command that is about to be executed
+#   Disables debugging upon entering TagmaDebug.
+proc ::TagmaDebug::EnableDebug {cmdstring code result op} {
+    variable debugDisabledCmd
+    if {$cmdstring eq $debugDisabledCmd} {
+        variable debugDisabled
+        set debugDisabled 0
+        set debugDisabledCmd ""
+        variable settings
+        if {$settings(verbose)} {
+            eputs -prefix "Leaving: $cmdstring"
+        }
+    }
+}
+
 # ::TagmaDebug::PrintHelp --
 #   Prints the help text.
 #
@@ -490,23 +543,27 @@ proc ::TagmaDebug::PrintHelp {} {
         "    a or >      Prints the command being executed."
         "    c or Enter  Continue execution."
         "    h or ?      Prints this message."
-        "    E           Toggle Enter acting as a shortcut to 'c Enter'."
         "    e or \[..\]   Evaluates a command."
         "    var         Watchs the modifications of some variables."
         "        log     Logs all modifications to stderr."
         "        break   Adds breakpoint for writes."
         "        info    Prints all variables being watched for."
         "        clear   Clears logging and breaks."
-        "    cmd"
+        "    cmd         Watches commands."
         "        enter   Set a break point for the entering of a command."
         "        leave   Set a break point for the leaving of a command."
         "        info    Prints all commands being watched.."
         "        step    Steps through the command."
         "        clear   Clear break points (using glob patterns)."
+        "    procs       Print defined procedures  (using glob patterns)."
         "    p           Prints the current level & procedure."
         "    r           Restarts the program."
-        "    V           Toggle verbosity. (Print extra info, when available.)"
         "    x or q      Exit the debugger."
+        "Settings: (Reflected by the flags in '{}')"
+        "    B           Toggle printing the body of procedures."
+        "    E           Toggle Enter acting as a shortcut to 'c Enter'."
+        "    P           Toggle stepping into package."
+        "    V           Toggle verbosity. (Print extra info, when available.)"
         "Based on TclDebugger by S.Arnold. v0.1 2007-09-09 http://wiki.tcl.tk/19872"
         }
 }
@@ -528,8 +585,10 @@ proc ::TagmaDebug::debug {{cmdstring ""}} {
 
     while 1 {
         # Build the prompt details.
-        set flags [expr {$settings(enter) ? "E" : ""}]
-        append flags [expr {$settings(verbose) ? "V" : ""}]
+        set    flags [expr {$settings(body)     ? "B" : ""}]
+        append flags [expr {$settings(enter)    ? "E" : ""}]
+        append flags [expr {$settings(packages) ? "P" : ""}]
+        append flags [expr {$settings(verbose)  ? "V" : ""}]
         set level [uplevel 1 info level]
         set command ""
         if {$level > 0} {
@@ -577,9 +636,6 @@ proc ::TagmaDebug::debug {{cmdstring ""}} {
             c       {
                 return
             }
-            E       {
-                set settings(enter) [expr {!$settings(enter)}]
-            }
             e       {
                 if {[catch {eputs [uplevel 1 [lrange $line 1 end]]} msg]} {
                     eputs "Error: $msg"
@@ -587,6 +643,21 @@ proc ::TagmaDebug::debug {{cmdstring ""}} {
             }
             h - ?   {
                 PrintHelp
+            }
+            procs   {
+                variable procs
+                if {[llength $line] eq 1} {
+                    eputs -list $procs
+                } else {
+                    set print_list {}
+                    set search [lindex $line 1]
+                    foreach proc $procs {
+                        if {[string match $search $proc]} {
+                            lappend print_list $proc
+                        }
+                    }
+                    eputs -list $print_list
+                }
             }
             p       {
                 set command "::"
@@ -706,11 +777,20 @@ proc ::TagmaDebug::debug {{cmdstring ""}} {
                 eval exec [list [info nameofexecutable] $argv0] $argv
                 exit
             }
-            V       {
-                set settings(verbose) [expr {!$settings(verbose)}]
-            }
             x - q   {
                 exit
+            }
+            B       {
+                set settings(body) [expr {!$settings(body)}]
+            }
+            E       {
+                set settings(enter) [expr {!$settings(enter)}]
+            }
+            P       {
+                set settings(packages) [expr {!$settings(packages)}]
+            }
+            V       {
+                set settings(verbose) [expr {!$settings(verbose)}]
             }
             default {
                 eputs "no such command: $command"
@@ -760,6 +840,9 @@ proc ::TagmaDebug::Prepare {} {
     # Always catch at the end of the program.
     trace add execution __TagmaDebugComplete enter ::TagmaDebug::Enter
 
+    # Traces to re-enable debugging after certain commands.
+    trace add execution package leave ::TagmaDebug::EnableDebug
+
     eputs $settings(descr)
     eputs "Type h to the prompt to get help."
     eputs ""
@@ -778,14 +861,14 @@ proc ::TagmaDebug::Prepare {} {
 # Side effect:
 #   Invokes the debugger if called and the real unknown throws an error.
 #   Prints details of the error, and args if verbose.
-rename unknown _original_unknown
+rename unknown _tagma_unknown
 proc unknown {args} {
     variable ::TagmaDebug::settings
     if {$::TagmaDebug::settings(verbose)} {
         ::TagmaDebug::eputs "'unknown' has been invoked with: $args"
     }
 
-    if {[catch {uplevel 1 [list _original_unknown {*}$args]} msg]} {
+    if {[catch {uplevel 1 [list _tagma_unknown {*}$args]} msg]} {
         ::TagmaDebug::eputs "Error from 'unknown': $msg"
         if {$::TagmaDebug::settings(verbose)} {
             ::TagmaDebug::eputs "Args passed to 'unknown': $args"
@@ -793,9 +876,9 @@ proc unknown {args} {
         ::TagmaDebug::debug
     }
 
-    # Allow tracing of commands again.
-    variable ::TagmaDebug::debugInTagma
-    set ::TagmaDebug::debugInTagma 0
+    # Re-enable debugging.
+    variable ::TagmaDebug::debugDisabled
+    if {$debugDisabled > 0} {set debugDisabled 0}
 }
 
 # __TagmaDebugMain --
@@ -830,6 +913,40 @@ proc __TagmaDebugMain {} {
 # Side effect:
 #   Causes the debugger to be entered.
 proc __TagmaDebugComplete {} {
+}
+
+# proc --
+#   Replacement for "proc" to record procedures as they are created.
+#
+# Arguments:
+#   name        Name of the procedure,
+#   args        Argument list for the procedure.
+#   body        Procedure body.
+#
+# Result:
+#   None
+#
+# Side effect:
+#   Records the procedure in the list procs
+#   Creates the procedure as normal.
+rename proc _tagma_proc
+_tagma_proc proc {name args body} {
+    variable ::TagmaDebug::settings
+    variable ::TagmaDebug::procs
+
+    if {$::TagmaDebug::settings(verbose)} {
+        ::TagmaDebug::eputs "Creating procedure '$name' {$args}."
+    }
+
+    # Add the procedure to the procs list.
+    set ::TagmaDebug::procs [::TagmaDebug::Store $::TagmaDebug::procs $name]
+
+    # Create the procedure.
+    _tagma_proc $name $args $body
+
+    # Re-enable debugging.
+    variable ::TagmaDebug::debugDisabled
+    if {$debugDisabled > 0} {set debugDisabled 0}
 }
 
 # Prepare and go!
