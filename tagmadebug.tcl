@@ -1,6 +1,6 @@
 #!/usr/bin/env tclsh
 # tagma.tcl --
-# Last Modified: 2011-08-28
+# Last Modified: 2011-09-02
 #
 # Implements simple debugging for TCL.
 # By Lorance Stinson AT Gmail.....
@@ -91,7 +91,8 @@ proc ::TagmaDebug::eputs {args} {
         }
     }
 
-    foreach arg [expr {$list ? [lindex $args $count] : [lrange $args $count end]}] {
+    foreach arg [expr {$list ? [lindex $args $count] :
+                               [lrange $args $count end]}] {
         puts stderr "$prefix$arg"
     }
 }
@@ -175,8 +176,8 @@ proc ::TagmaDebug::Break {name1 name2 op} {
         unset {
             eputs -prefix "unset [var $name1 $name2]"
             # Stop tracing this variable if it is unset.
-            if {[Unbreak [var $name1 $name2]] < 0} {
-                Unbreak $name1
+            if {[RemoveVarTrace [var $name1 $name2] break ::TagmaDebug::Break] < 0} {
+                RemoveVarTrace $name1 break ::TagmaDebug::Break
             }
         }
         default {
@@ -188,29 +189,6 @@ proc ::TagmaDebug::Break {name1 name2 op} {
     # Re-enable debugging.
     variable debugDisabled
     if {$debugDisabled > 0} {set debugDisabled 0}
-}
-
-# ::TagmaDebug::Unbreak --
-#   Removes the break trace from a variable.
-#
-# Arguments:
-#   name        The name of the variable.
-#
-# Result:
-#   -1 if the variable is not found break list.
-#
-# Side effect:
-#   Tracing is disabled on the variable.
-#   The variable name is removed from the break list.
-proc ::TagmaDebug::Unbreak {name} {
-    variable break
-    set i [lsearch -exact $break $name]
-    if {$i < 0} {return -1}
-    set break [lreplace $break $i $i]
-    catch {
-        trace remove variable $name {read write unset} ::TagmaDebug::Break
-    }
-    return 0
 }
 
 # ::TagmaDebug::Log --
@@ -233,8 +211,8 @@ proc ::TagmaDebug::Log {name1 name2 op} {
         unset {
             eputs -prefix "unset [var $name1 $name2]"
             # Stop tracing this variable if it is unset.
-            if {[Unlog [var $name1 $name2]] < 0} {
-                Unlog $name1
+            if {[RemoveVarTrace [var $name1 $name2] log ::TagmaDebug::Log] < 0} {
+                RemoveVarTrace $name1 log ::TagmaDebug::Log
             }
         }
         default {
@@ -247,25 +225,27 @@ proc ::TagmaDebug::Log {name1 name2 op} {
     if {$debugDisabled > 0} {set debugDisabled 0}
 }
 
-# ::TagmaDebug::Unlog --
-#   Removes the logging trace from a variable.
+# ::TagmaDebug::RemoveVarTrace --
+#   Remove a trace from a variable.
 #
 # Arguments:
 #   name        The name of the variable.
+#   list        The list to remove the variable from.
+#   callBack    The callback command to remove.
 #
 # Result:
 #   -1 if the variable is not found in the log list.
 #
 # Side effect:
 #   Tracing is disabled on the variable.
-#   The variable name is removed from the log list.
-proc ::TagmaDebug::Unlog {name} {
-    variable log
-    set i [lsearch -exact $log $name]
+#   The variable name is removed from the list.
+proc ::TagmaDebug::RemoveVarTrace {name list callBack} {
+    variable $list
+    set i [lsearch -exact [set $list] $name]
     if {$i < 0} {return -1}
-    set log [lreplace $log $i $i]
+    set $list [lreplace [set $list] $i $i]
     catch {
-        trace remove variable $name {read write unset} ::TagmaDebug::Log
+        trace remove variable $name {read write unset} $callBack
     }
     return 0
 }
