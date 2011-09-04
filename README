@@ -2,10 +2,16 @@
     TagmaDebug - Interactive TCL Debugger
 
 SYNOPSIS
-    tagmadebug.tcl <YourScript.tcl>
+    tagmadebug.tcl [Options] [--] YourScript.tcl
 
 OPTIONS
-    *NONE* Only takes a TCL script to be debugged.
+    -c        Connect to a Tagma debug control server.
+
+    -H HOST   Connect to HOST instead of localhost.
+
+    -h        Display this text.
+
+    -P PORT   Connect to PORT instead of 5444.
 
 DESCRIPTION
     TagmaDebug is a simple interactive debugger for TCL programs.
@@ -29,12 +35,14 @@ DESCRIPTION
 PROMPT
     The prompt is composed of flags in curly brackets '{}', the level of
     execution, the procedure (if one is executing) and the name of the
-    program.
+    debugger.
 
-    The flags indicate when certain features are enabled. 'E' indicates
-    enter will continue a step, the same as typing 'c Enter'. 'V' indicates
-    verbose mode is enabled. This will cause additional output in certain
-    places.
+    The flags indicate when certain features are enabled. 'B' indicates the
+    body of precedures will be displayed. If disabled only the procedure
+    name and arguments are printed. 'E' indicates enter will continue a
+    step, the same as typing 'c Enter'. 'P' indicates packages will be
+    stepped into. 'V' indicates verbose mode is enabled. This will cause
+    additional output in certain places.
 
     Sample prompt: {E}(1 => foo)Tagma>
 
@@ -42,8 +50,8 @@ PROMPT
     level deep in the procedure "foo".
 
 COMMANDS
-    There are a few interactive commands that control the debugger. There is
-    no line editing and very little nicety.
+    There are several interactive commands that control the debugger. There
+    is no line editing and very little nicety.
 
     !           Executes a shell command.
 
@@ -77,6 +85,9 @@ COMMANDS
     cmd clear   Clear break points. Passes the command to [string match ...]
                 so globbing can be used.
 
+    con         Connect to a Tagma Debug control server. Optional Host and
+                port. (Default: localhost and 5444)
+
     p           Prints the current level & procedure. When at the top level
                 '::' is printed for the procedure.
 
@@ -95,6 +106,40 @@ SETTINGS
     P       Toggle stepping into package.
 
     V       Toggle verbosity. Print extra info, when available.
+
+CONTROL SERVER
+    NOTE: The shell does not work under Tkcon.
+
+    The program server.tcl starts a TCP server. Tagma Debug can connect to
+    this server for remote control. All debugger output and user input is
+    sent to comes from the server. The server requires an event loop process
+    to function. By default if the program is run it starts the server
+    process, enters the remote debug shell and starts an event loop. The
+    shell is designed to make debugging similar to using Tagma Debug
+    directly.
+
+    The 'tagma' command is used to control the server and interact with the
+    debugger. With no options it sends its areguments to the remote
+    debugger.
+
+    tagma Options:
+
+    -help     Print help for the tagma command.
+
+    -select   Select from connected debuggers. Lists the available and
+              current connections with no arguments.
+
+    -shell    Enter an interactive shell. Simualtes working directly with
+              the debugger. If there is no active connection it will wait
+              for a client to connect. The server must be running before the
+              shell is started.
+
+    -start    Start the Tagma server process. (Optional port)
+
+    -verbose  Control verbose mode. (on/off) Displays the current state with
+              no arguments.
+
+    --        End option processing.
 
 PORTABILITY
     TagmaDebug should work with any TCL version 8.4 or later. Testing has

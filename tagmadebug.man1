@@ -124,7 +124,7 @@
 .\" ========================================================================
 .\"
 .IX Title "MAN 1"
-.TH MAN 1 "2011-09-01" "perl v5.10.1" "User Contributed Perl Documentation"
+.TH MAN 1 "2011-09-03" "perl v5.10.1" "User Contributed Perl Documentation"
 .\" For nroff, turn off justification.  Always turn off hyphenation; it makes
 .\" way too many mistakes in technical documents.
 .if n .ad l
@@ -134,10 +134,21 @@
 TagmaDebug \- Interactive \s-1TCL\s0 Debugger
 .SH "SYNOPSIS"
 .IX Header "SYNOPSIS"
-tagmadebug.tcl <YourScript.tcl>
+tagmadebug.tcl [Options] [\-\-] YourScript.tcl
 .SH "OPTIONS"
 .IX Header "OPTIONS"
-\&\fI\s-1NONE\s0\fR Only takes a \s-1TCL\s0 script to be debugged.
+.IP "\fB\-c\fR" 10
+.IX Item "-c"
+Connect to a Tagma debug control server.
+.IP "\fB\-H\fR \s-1HOST\s0" 10
+.IX Item "-H HOST"
+Connect to \s-1HOST\s0 instead of localhost.
+.IP "\fB\-h\fR" 10
+.IX Item "-h"
+Display this text.
+.IP "\fB\-P\fR \s-1PORT\s0" 10
+.IX Item "-P PORT"
+Connect to \s-1PORT\s0 instead of 5444.
 .SH "DESCRIPTION"
 .IX Header "DESCRIPTION"
 \&\fBTagmaDebug\fR is a simple interactive debugger for \s-1TCL\s0 programs.
@@ -160,11 +171,13 @@ The debugger will not step into unknown.
 .SH "PROMPT"
 .IX Header "PROMPT"
 The prompt is composed of flags in curly brackets '{}', the level of
-execution, the procedure (if one is executing) and the name of the program.
+execution, the procedure (if one is executing) and the name of the debugger.
 .PP
-The flags indicate when certain features are enabled.  'E' indicates enter
-will continue a step, the same as typing 'c Enter'. 'V' indicates verbose mode
-is enabled.  This will cause additional output in certain places.
+The flags indicate when certain features are enabled. 'B' indicates the body
+of precedures will be displayed. If disabled only the procedure name and
+arguments are printed. 'E' indicates enter will continue a step, the same as
+typing 'c Enter'. 'P' indicates packages will be stepped into. 'V' indicates
+verbose mode is enabled.  This will cause additional output in certain places.
 .PP
 Sample prompt: {E}(1 => foo)Tagma>
 .PP
@@ -172,7 +185,7 @@ This prompt indicates Enter will continue a step and execution is one level
 deep in the procedure \*(L"foo\*(R".
 .SH "COMMANDS"
 .IX Header "COMMANDS"
-There are a few interactive commands that control the debugger. There is no
+There are several interactive commands that control the debugger. There is no
 line editing and very little nicety.
 .IP "\fB!\fR" 12
 .IX Item "!"
@@ -219,6 +232,10 @@ is a breakpoint.
 .IX Item "cmd clear"
 Clear break points. Passes the command to [string match ...] so globbing can
 be used.
+.IP "\fBcon\fR" 12
+.IX Item "con"
+Connect to a Tagma Debug control server.
+Optional Host and port. (Default: localhost and 5444)
 .IP "\fBp\fR" 12
 .IX Item "p"
 Prints the current level & procedure. When at the top level '::' is printed
@@ -245,6 +262,42 @@ Toggle stepping into package.
 .IP "\fBV\fR" 8
 .IX Item "V"
 Toggle verbosity. Print extra info, when available.
+.SH "CONTROL SERVER"
+.IX Header "CONTROL SERVER"
+\&\fB\s-1NOTE:\s0\fR The shell does not work under Tkcon.
+.PP
+The program server.tcl starts a \s-1TCP\s0 server. Tagma Debug can connect to this
+server for remote control. All debugger output and user input is sent to comes
+from the server. The server requires an event loop process to function. By
+default if the program is run it starts the server process, enters the remote
+debug shell and starts an event loop. The shell is designed to make debugging
+similar to using Tagma Debug directly.
+.PP
+The 'tagma' command is used to control the server and interact with the
+debugger. With no options it sends its areguments to the remote debugger.
+.PP
+\&\fBtagma Options:\fR
+.IP "\fB\-help\fR" 10
+.IX Item "-help"
+Print help for the tagma command.
+.IP "\fB\-select\fR" 10
+.IX Item "-select"
+Select from connected debuggers. Lists the available and current connections
+with no arguments.
+.IP "\fB\-shell\fR" 10
+.IX Item "-shell"
+Enter an interactive shell. Simualtes working directly with the debugger. If
+there is no active connection it will wait for a client to connect. The server
+must be running before the shell is started.
+.IP "\fB\-start\fR" 10
+.IX Item "-start"
+Start the Tagma server process. (Optional port)
+.IP "\fB\-verbose\fR" 10
+.IX Item "-verbose"
+Control verbose mode. (on/off) Displays the current state with no arguments.
+.IP "\fB\-\-\fR" 10
+.IX Item "--"
+End option processing.
 .SH "PORTABILITY"
 .IX Header "PORTABILITY"
 \&\fBTagmaDebug\fR should work with any \s-1TCL\s0 version 8.4 or later. Testing has thus

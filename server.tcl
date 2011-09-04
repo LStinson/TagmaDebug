@@ -1,11 +1,16 @@
 #!/usr/bin/env tclsh
 # tagmaserver.tcl --
 # Last Modified: 2011-09-03
+# vim:ft=tcl foldmethod=marker
 #
 # A control server to the Tagma Debugger.
-# The debugger connects to the server allowing remote control
-# of the debuggger.
+# By Lorance Stinson AT Gmail.....
+#
+# Server process for remotely controlling Tagma Debugger.
+# The debugger connects to the server allowing remote control through
+# the 'tagma' command or a shell that mimics the debugger.
 
+# Namespace -- {{{1
 namespace eval ::TagmaServer:: {
     namespace export tagma
     variable defaultPort 5444
@@ -23,7 +28,7 @@ namespace eval ::TagmaServer:: {
     }
     variable endshell 0
 }
-# ::TagmaDebug::print --
+# ::TagmaDebug::print -- {{{1
 #   Prints string(s).
 #   Each string is printed on a separate line.
 #
@@ -77,7 +82,7 @@ proc ::TagmaServer::print {args} {
 }
 
 
-# ::TagmaServer::Server --
+# ::TagmaServer::Server -- {{{1
 #   Start the server process.
 #
 # Arguments:
@@ -101,7 +106,7 @@ proc ::TagmaServer::Server {{port ""}} {
     set settings(channel) [socket -server ::TagmaServer::Accept $port]
 }
 
-# ::TagmaServer::Accept --
+# ::TagmaServer::Accept -- {{{1
 #   Sets up a client connection.
 #
 # Arguments:
@@ -129,7 +134,7 @@ proc ::TagmaServer::Accept {socket addr port} {
     }
 }
 
-# ::TagmaServer::Read --
+# ::TagmaServer::Read -- {{{1
 #   Read data from the debugger (client).
 #
 # Arguments:
@@ -160,19 +165,19 @@ proc ::TagmaServer::Read {socket clientID} {
     }
 }
 
-# ::TagmaServer::Write --
+# ::TagmaServer::Write -- {{{1
 #   Write data to the debugger (client).
 #
 # Arguments:
 #   clientID    The client ID. (IP Addr:Port)
-#   args        The data to send to the client.
+#   data        The data to send to the client.
 #
 # Result:
 #   None
 #
 # Side effect:
 #   Closes the connection if the socket goes EOF.
-proc ::TagmaServer::Write {clientID args} {
+proc ::TagmaServer::Write {clientID data} {
     variable clients
     if {[array get clients $clientID] eq ""} {
         return
@@ -183,13 +188,13 @@ proc ::TagmaServer::Write {clientID args} {
         return
     }
     
-    puts $socket $args
+    puts $socket $data
     if {[catch {flush $socket}]} {
         CloseConnection $clientID
     }
 }
 
-# ::TagmaServer::CloseConnection --
+# ::TagmaServer::CloseConnection -- {{{1
 #   Closes a client socket.
 #
 # Arguments:
@@ -213,7 +218,7 @@ proc ::TagmaServer::CloseConnection {clientID} {
     close $socket
 }
 
-# ::TagmaServer::PrintHelp --
+# ::TagmaServer::PrintHelp -- {{{1
 #   Prints the help text.
 #
 # Arguments:
@@ -244,7 +249,7 @@ proc ::TagmaServer::PrintHelp {} {
     }
 }
 
-# ::TagmaServer::Shell --
+# ::TagmaServer::Shell -- {{{1
 #   Shell that mimics using the debuger directly.
 #
 # Arguments:
@@ -265,7 +270,7 @@ proc ::TagmaServer::Shell {} {
     set ::TagmaServer::endshell 0
 }
 
-# ::TagmaServer::ShellRead --
+# ::TagmaServer::ShellRead -- {{{1
 #   The read function for the interactive shell.
 #
 # Arguments:
@@ -279,7 +284,6 @@ proc ::TagmaServer::Shell {} {
 proc ::TagmaServer::ShellRead {} {
     variable settings
     if {[gets stdin input] < 0} {
-        puts "DIE!!"
         set ::TagmaServer::endshell 1
         return
     }
@@ -290,7 +294,7 @@ proc ::TagmaServer::ShellRead {} {
     }
 }
 
-# ::TagmaServer::tagma --
+# ::TagmaServer::tagma -- {{{1
 #   User interface to TagmaServer.
 #   With no options send its args to the remoge debugger.
 #   Controls the server and the remote debugger.
@@ -352,6 +356,11 @@ proc ::TagmaServer::tagma {args} {
                 return
             }
             -shell {
+                if {$settings(channel) eq ""} {
+                    print "The server is not running."
+                    print "IT must be started before the shell can be used."
+                    return
+                }
                 Shell
                 return
             }
@@ -365,7 +374,8 @@ proc ::TagmaServer::tagma {args} {
                 if {$count < $arg_count} {
                     set port [lindex $args $count]
                 }
-                Shell $port
+                Server $port
+                return
             }
             -verbose {
                 incr count
@@ -391,9 +401,11 @@ proc ::TagmaServer::tagma {args} {
     Write $settings(current) $args
 }
 
+# Import the tagma command. {{{1
+# This is the only thing exported from the namespace.
 namespace import ::TagmaServer::tagma
 
-# Processing if called as a script.
+# Processing if called as a script. {{{1
 if {[string match "server*" [file tail $argv0]]} {
     ::TagmaServer::print -prefix "Starting TagmaServer and interactive shell."
     ::TagmaServer::Server
