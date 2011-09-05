@@ -52,8 +52,8 @@ namespace eval ::TagmaDebug:: {
 # Side effect:
 #   None
 proc ::TagmaDebug::CheckCommand {command} {
-    if {[uplevel 1 info procs $command] ne "" ||
-        [uplevel 1 info commands $command] ne "" ||
+    if {[uplevel 1 info procs $command]     ne "" ||
+        [uplevel 1 info commands $command]  ne "" ||
         [uplevel 1 info functions $command] ne ""} {
         return 1
     }
@@ -105,7 +105,7 @@ proc ::TagmaDebug::EPuts {args} {
     set list 0
     set prefix ""
     foreach arg $args {
-        switch -nocase -- $arg {
+        switch -exact -- $arg {
             -- {
                 incr count
                 break
@@ -130,7 +130,7 @@ proc ::TagmaDebug::EPuts {args} {
                                [lrange $args $count end]}] {
         eval "$cmd \$channel \"\$prefix\$arg\""
     }
-    if {[catch {flush $channel}]} {
+    if {$settings(server) && [catch {flush $channel}]} {
         CloseConnection
     }
 }
@@ -196,7 +196,7 @@ proc ::TagmaDebug::PrintVariable {varname} {
 # Arguments:
 #   name        The name of the variable.
 #   list        The list to remove the variable from.
-#   callBack    The callback command to remove.
+#               Also the mode passed to VarCallback.
 #
 # Result:
 #   -1 if the variable is not found in the log list.
@@ -204,14 +204,13 @@ proc ::TagmaDebug::PrintVariable {varname} {
 # Side effect:
 #   Tracing is disabled on the variable.
 #   The variable name is removed from the list.
-proc ::TagmaDebug::RemoveVarTrace {name list callBack} {
+proc ::TagmaDebug::RemoveVarTrace {name list} {
     variable $list
     set i [lsearch -exact [set $list] $name]
     if {$i < 0} {return -1}
     set $list [lreplace [set $list] $i $i]
-    catch {
-        trace remove variable $name {read write unset} $callBack
-    }
+    uplevel 2 [list trace remove variable $name {read write unset} \
+                    "::TagmaDebug::VarCallback $list"]
     return 0
 }
 
@@ -251,10 +250,11 @@ proc ::TagmaDebug::var {name key} {
 
 # XXX Tracing Callbacks XXX {{{1
 
-# ::TagmaDebug::Break -- {{{2
-#   Callback for breaking on variables.
+# ::TagmaDebug::VarCallback -- {{{2
+#   Callback for tracing variables.
 #
 # Arguments:
+#   mode        The mode (break or log).
 #   From the trace command.
 #
 # Result:
@@ -262,10 +262,10 @@ proc ::TagmaDebug::var {name key} {
 #
 # Side effect:
 #   Prints the information for the variable.
-#   Enters the debugger prompt.
+#   Enters the debugger prompt if the mode is break.
 #   Disables logging if the variable was unset.
-#   Re-enables debuggin.
-proc ::TagmaDebug::Break {name1 name2 op} {
+#   Re-enables debuggin if disabled..
+proc ::TagmaDebug::VarCallback {mode name1 name2 op} {
     switch -- $op {
         read - write {
             EPuts -prefix "$op [var $name1 $name2] = [uplevel 1 set [var $name1 $name2]]"
@@ -273,48 +273,17 @@ proc ::TagmaDebug::Break {name1 name2 op} {
         unset {
             EPuts -prefix "unset [var $name1 $name2]"
             # Stop tracing this variable if it is unset.
-            if {[RemoveVarTrace [var $name1 $name2] break ::TagmaDebug::Break] < 0} {
-                RemoveVarTrace $name1 break ::TagmaDebug::Break
+            if {[RemoveVarTrace [var $name1 $name2] $mode] < 0} {
+                RemoveVarTrace $name1 $mode
             }
         }
         default {
-            error "Break: Unknown OP '$op' for '$name1' - '$name2'."
+            error "VarCallback: Unknown OP '$op' for '$name1' - '$name2'."
         }
     }
-    uplevel 1 ::TagmaDebug::debug
 
-    # Re-enable debugging.
-    variable debugDisabled
-    if {$debugDisabled > 0} {set debugDisabled 0}
-}
-
-# ::TagmaDebug::Log -- {{{2
-#   Callback for logging variables.
-#
-# Arguments:
-#   From the trace command.
-#
-# Result:
-#
-# Side effect:
-#   Prints the information for the variable.
-#   Disables logging if the variable was unset.
-#   Re-enables debugging.
-proc ::TagmaDebug::Log {name1 name2 op} {
-    switch -- $op {
-        read - write {
-            EPuts -prefix "$op [var $name1 $name2] = [uplevel 1 set [var $name1 $name2]]"
-        }
-        unset {
-            EPuts -prefix "unset [var $name1 $name2]"
-            # Stop tracing this variable if it is unset.
-            if {[RemoveVarTrace [var $name1 $name2] log ::TagmaDebug::Log] < 0} {
-                RemoveVarTrace $name1 log ::TagmaDebug::Log
-            }
-        }
-        default {
-            error "Log: Unknown OP '$op' for '$name1' - '$name2'."
-        }
+    if {$mode eq "break"} {
+        uplevel 1 ::TagmaDebug::debug
     }
 
     # Re-enable debugging.
@@ -668,6 +637,7 @@ proc ::TagmaDebug::debug {{cmdstring ""}} {
             puts ""
             exit
         }
+
         if {$line eq ""} {
             if {$settings(enter)} {
                 return
@@ -743,12 +713,12 @@ proc ::TagmaDebug::debug {{cmdstring ""}} {
                     log     {
                         variable log
                         set log [Store $log $value]
-                        uplevel 1 [list trace add variable $value {read write unset} ::TagmaDebug::Log]
+                        uplevel 1 [list trace add variable $value {read write unset} "::TagmaDebug::VarCallback log"]
                     }
                     break   {
                         variable break
                         set break [Store $break $value]
-                        uplevel 1 [list trace add variable $value {read write unset} ::TagmaDebug::Break]
+                        uplevel 1 [list trace add variable $value {read write unset} "::TagmaDebug::VarCallback break"]
                     }
                     info    {
                         foreach {n t} {log Logged break "Breaks at"} {
@@ -759,14 +729,14 @@ proc ::TagmaDebug::debug {{cmdstring ""}} {
                         }
                     }
                     clear   {
-                        foreach {v t cmd} {log Logged Unlog break "Breaks at" Unbreak} {
+                        foreach {v t} {log Logged break Breaks} {
                             EPuts "clearing $t..."
                             variable $v
                             foreach i [set $v] {
-                                if {[string match $value $i]]} {
+                                if {[string match $value $i]} {
                                     EPuts $i
-                                    # unlogs or unbreaks the variable
-                                    ::TagmaDebug::$cmd $i
+                                    # Removes the trace from a variable.
+                                    RemoveVarTrace $i $v
                                 }
                             }
                         }
@@ -882,7 +852,8 @@ proc ::TagmaDebug::debug {{cmdstring ""}} {
 # Side effect:
 #   The command line usage is printed and the program exists.
 proc ::TagmaDebug::Usage {{comment ""}} {
-    global argv0 settings
+    global argv0
+    variable settings
 
     if {$comment ne ""} {
         EPuts $comment
