@@ -244,6 +244,7 @@ proc ::TagmaServer::PrintHelp {} {
         "                Simualtes working directly with the debugger."
         "                Waits for a connection if there is none."
         "    -start      Start the Tagma server process. (Optional port)"
+        "    -stop       Stop the Tagma server process."
         "    -verbose    Control/Display verbose mode. (on/off)"
         "    --          End option processing."
     }
@@ -377,6 +378,15 @@ proc ::TagmaServer::tagma {args} {
                 Server $port
                 return
             }
+            -stop {
+                if {$settings(channel) eq ""} {
+                    print "The server has already been stopped."
+                    return
+                }
+                close $settings(channel)
+                set settings(channel) ""
+                return
+            }
             -verbose {
                 incr count
                 if {$count < $arg_count} {
@@ -404,6 +414,7 @@ proc ::TagmaServer::tagma {args} {
 # Import the tagma command. {{{1
 # This is the only thing exported from the namespace.
 namespace import ::TagmaServer::tagma
+::TagmaServer::print "Tagma Server loaded. Type 'tagma -help' to get started."
 
 # Processing if called as a script. {{{1
 if {[string match "server*" [file tail $argv0]]} {

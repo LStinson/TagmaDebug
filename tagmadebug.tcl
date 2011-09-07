@@ -139,26 +139,19 @@ proc ::TagmaDebug::EPuts {args} {
 #   Open a connection to a server.
 #
 # Arguments:
-#   input       Optional user input from the con command.
-#               This is the entire line they entered.
+#   None
 #
 # Result:
 #   None
 #
 # Side effect:
 #   The connection is Opend and the settings are updated.
-proc ::TagmaDebug::OpenConnection {{input ""}} {
+proc ::TagmaDebug::OpenConnection {} {
     variable settings
-    if {[llength $input] > 1} {
-            set settings(serverHost) [lindex $input 1]
-    }
-    if {[llength $input] > 2} {
-            set settings(serverPort) [lindex $input 2]
-    }
     set host $settings(serverHost)
     set port $settings(serverPort)
     EPuts "Connecting to the server $host:$port..."
-    if {[catch {set socket [socket localhost 5444]} res]} {
+    if {[catch {set socket [socket $host $port]} res]} {
         EPuts "Unable to connect to $host:$port."
         EPuts "Error: $res"
         continue
@@ -188,30 +181,6 @@ proc ::TagmaDebug::PrintVariable {varname} {
     } else {
         EPuts -prefix "Variable '$varname' does not exist."
     }
-}
-
-# ::TagmaDebug::RemoveVarTrace -- {{{2
-#   Remove a trace from a variable.
-#
-# Arguments:
-#   name        The name of the variable.
-#   list        The list to remove the variable from.
-#               Also the mode passed to VarCallback.
-#
-# Result:
-#   -1 if the variable is not found in the log list.
-#
-# Side effect:
-#   Tracing is disabled on the variable.
-#   The variable name is removed from the list.
-proc ::TagmaDebug::RemoveVarTrace {name list} {
-    variable $list
-    set i [lsearch -exact [set $list] $name]
-    if {$i < 0} {return -1}
-    set $list [lreplace [set $list] $i $i]
-    uplevel 2 [list trace remove variable $name {read write unset} \
-                    "::TagmaDebug::VarCallback $list"]
-    return 0
 }
 
 # ::TagmaDebug::Store -- {{{2
@@ -250,6 +219,132 @@ proc ::TagmaDebug::var {name key} {
 
 # XXX Tracing Callbacks XXX {{{1
 
+# ::TagmaDebug::CmdCallback -- {{{2
+#   Callback for tracing commands.
+#
+# Arguments:
+#   From the trace command.
+#
+# Result:
+#   None
+#
+# Side effect:
+#   Prints information for the command.
+#   Disables logging if entering the debugger
+#   Enters the debugger prompt.
+proc ::TagmaDebug::_CmdCallback {args} {
+    variable debugDisabled
+    variable settings
+
+    if {$debugDisabled} { return }
+
+    # Extract the parts needed from the args.
+    set cmdstring [lindex $args 0]
+    set op [lindex $args end]
+
+    # Disable debugging for certain commands.
+    switch -glob -- $cmdstring {
+        ::TagmaDebug::* {
+            # Disable for the debugger its self.
+            set debugDisabled 1
+            return
+        }
+        "proc *" {
+            # Disable debug, but show the user it was called.
+            set debugDisabled 1
+            if {!$settings(body)} {
+                set cmdstring [lrange $cmdstring 0 end-1]
+            }
+        }
+        "::unknown *" {
+            # Disable debug, but show the user it was called.
+            set debugDisabled 1
+        }
+        "package *" {
+            if {!$settings(packages)} {
+                # Disable debug, but show the user it was called.
+                # Will not be re-enabled till after the command exits.
+                # See EnableDebug for more information.
+                variable debugDisabledCmd
+                set debugDisabled -1
+                set debugDisabledCmd $cmdstring
+            }
+        }
+    }
+
+    switch -- $op {
+        enter {
+            EPuts -prefix "Entering: [lindex $cmdstring 0]"
+            if {$settings(verbose)} {
+                EPuts -prefix "Args: [list [lrange $cmdstring 1 end]]"
+            }
+        }
+        leave {
+            EPuts -prefix "Leaving: [lindex $cmdstring 0]"
+            if {$settings(verbose)} {
+                set code [lindex args 1]
+                set result [lindex args 2]
+                EPuts -prefix "Result Code: $code"
+                EPuts -prefix "Result: [list $result]"
+            }
+        }
+        enterstep {
+            EPuts -prefix -list -- [split $cmdstring "\n\r"]
+        }
+        default {
+            error "CmdCallback: Unknown OP '$op' for '$cmdstring'."
+        }
+    }
+    uplevel 1 ::TagmaDebug::debug [list $cmdstring]
+}
+
+# ::TagmaDebug::__CmdCallback -- {{{2
+#   Fake CmdCallback to hide the first step.
+#   This step is really the uplevel call to start debugging.
+#   There is no need to see that.
+#
+# Arguments:
+#   From the trace command.
+#
+# Result:
+#   None
+#
+# Side effect:
+#   Renames CmdCallback to __CmdCallback.
+#   Renames _CmdCallback to CmdCallback.
+proc ::TagmaDebug::CmdCallback {args} {
+    rename ::TagmaDebug::CmdCallback ::TagmaDebug::__CmdCallback
+    rename ::TagmaDebug::_CmdCallback ::TagmaDebug::CmdCallback
+}
+
+# ::TagmaDebug::RemoveCmdTrace -- {{{2
+#   Remove a trace from a command.
+#
+# Arguments:
+#   name        The name of the command.
+#   list        The list to remove the command from.
+#
+# Result:
+#   -1 if the variable is not found in the list.
+#
+# Side effect:
+#   Tracing is disabled on the command.
+#   The command name is removed from the list.
+proc ::TagmaDebug::RemoveCmdTrace {name list} {
+    variable $list
+    set i [lsearch -exact [set $list] $name]
+    if {$i < 0} {return -1}
+    set $list [lreplace [set $list] $i $i]
+
+    if {$list eq "step"} {
+        set op "enterstep"
+    } else {
+        set op $list
+    }
+    catch { trace remove execution $name $op ::TagmaDebug::CmdCallback }
+    return 0
+}
+
 # ::TagmaDebug::VarCallback -- {{{2
 #   Callback for tracing variables.
 #
@@ -262,9 +357,9 @@ proc ::TagmaDebug::var {name key} {
 #
 # Side effect:
 #   Prints the information for the variable.
-#   Enters the debugger prompt if the mode is break.
 #   Disables logging if the variable was unset.
-#   Re-enables debuggin if disabled..
+#   Enters the debugger prompt if the mode is break.
+#   Re-enables debuggin if disabled.
 proc ::TagmaDebug::VarCallback {mode name1 name2 op} {
     switch -- $op {
         read - write {
@@ -291,230 +386,27 @@ proc ::TagmaDebug::VarCallback {mode name1 name2 op} {
     if {$debugDisabled > 0} {set debugDisabled 0}
 }
 
-# ::TagmaDebug::Enter -- {{{2
-#   Callback for command entry.
+# ::TagmaDebug::RemoveVarTrace -- {{{2
+#   Remove a trace from a variable.
 #
 # Arguments:
-#   From the trace command.
+#   name        The name of the variable.
+#   list        The list to remove the variable from.
+#               Also the mode passed to VarCallback.
 #
 # Result:
-#   None
+#   -1 if the variable is not found in the list.
 #
 # Side effect:
-#   prints when the command is entered.
-#   Enters the debugger prompt.
-#   Disables debugging upon entering TagmaDebug.
-proc ::TagmaDebug::Enter {cmdstring op} {
-    variable debugDisabled
-    if {$debugDisabled} { return }
-
-    if {[string range $cmdstring 0 13] eq "::TagmaDebug::"} {
-        # Disable debuggin.
-        set debugDisabled 1
-        return
-    }
-
-    switch -- $op {
-        enter {
-            EPuts -prefix "Entering: [lindex $cmdstring 0]"
-            variable settings
-            if {$settings(verbose)} {
-                EPuts -prefix "Args: [list [lrange $cmdstring 1 end]]"
-            }
-        }
-        default {
-            error "Enter: Unknown OP '$op' for '$cmdstring'."
-        }
-    }
-    uplevel 1 ::TagmaDebug::debug [list $cmdstring]
-}
-
-# ::TagmaDebug::Unenter -- {{{2
-#   Removes the enter trace from a command.
-#
-# Arguments:
-#   name        The command name.
-#
-# Result:
-#   -1 if the command is not found in the enter list.
-#
-# Side effect:
-#   Tracing is disabled on the command.
-#   The variable name is removed from the enter list.
-proc ::TagmaDebug::Unenter {name} {
-    variable enter
-    set i [lsearch -exact $enter $name]
+#   Tracing is disabled on the variable.
+#   The variable name is removed from the list.
+proc ::TagmaDebug::RemoveVarTrace {name list} {
+    variable $list
+    set i [lsearch -exact [set $list] $name]
     if {$i < 0} {return -1}
-    set enter [lreplace $enter $i $i]
-    catch {
-        trace remove execution $name enter ::TagmaDebug::Enter
-    }
-    return 0
-}
-
-# ::TagmaDebug::Leave -- {{{2
-#   Callback for command leave.
-#
-# Arguments:
-#   From the trace command.
-#
-# Result:
-#   None
-#
-# Side effect:
-#   prints when the command is left.
-#   Enters the debugger prompt.
-#   Disables debugging upon entering TagmaDebug.
-proc ::TagmaDebug::Leave {cmdstring code result op} {
-    variable debugDisabled
-    if {$debugDisabled} { return }
-
-    if {[string range $cmdstring 0 13] eq "::TagmaDebug::"} {
-        # Disable debugging
-        set debugDisabled 1
-        return
-    }
-
-    switch -- $op {
-        leave {
-            EPuts -prefix "Leaving: [lindex $cmdstring 0]"
-            variable settings
-            if {$settings(verbose)} {
-                EPuts -prefix "Result Code: $code"
-                EPuts -prefix "Result: [list $result]"
-            }
-        }
-        default {
-            error "Leave: Unknown OP '$op' for '$cmdstring'."
-        }
-    }
-    uplevel 1 ::TagmaDebug::debug [list $cmdstring]
-}
-
-# ::TagmaDebug::Unleave -- {{{2
-#   Removes the leave trace from a command.
-#
-# Arguments:
-#   name        The command name.
-#
-# Result:
-#   -1 if the command is not found in the leave list.
-#
-# Side effect:
-#   Tracing is disabled on the command.
-#   The variable name is removed from the leave list.
-proc ::TagmaDebug::Unleave {name} {
-    variable leave
-    set i [lsearch -exact $leave $name]
-    if {$i < 0} {return -1}
-    set leave [lreplace $leave $i $i]
-    catch {
-        trace remove execution $name leave ::TagmaDebug::Leave
-    }
-    return 0
-}
-
-# ::TagmaDebug::Step -- {{{2
-#   Callback for command step.
-#   This is really named _Step because the first step isn't real.
-#   So to skip that step a fake Step is called for the first one
-#   then renames this step to Step.
-#
-# Arguments:
-#   From the trace command.
-#
-# Result:
-#   None
-#
-# Side effect:
-#   Prints the command that is about to be executed
-#   Disables debugging upon entering TagmaDebug.
-proc ::TagmaDebug::_Step {cmdstring op} {
-    variable debugDisabled
-    if {$debugDisabled} { return }
-
-    # Disable debugging for certain commands.
-    switch -glob -- $cmdstring {
-        ::TagmaDebug::* {
-            # Disable for the debugger its self.
-            set debugDisabled 1
-            return
-        }
-        "proc *" {
-            # Disable debug, but show the user it was called.
-            set debugDisabled 1
-            variable settings
-            if {!$settings(body)} {
-                set cmdstring [lrange $cmdstring 0 end-1]
-            }
-        }
-        "::unknown *" {
-            # Disable debug, but show the user it was called.
-            set debugDisabled 1
-        }
-        "package *" {
-            variable settings
-            if {!$settings(packages)} {
-                # Disable debug, but show the user it was called.
-                # Will not be re-enabled till after the command exits.
-                # See EnableDebug for more information.
-                variable debugDisabledCmd
-                set debugDisabled -1
-                set debugDisabledCmd $cmdstring
-            }
-        }
-    }
-
-    switch -- $op {
-        enterstep {
-            EPuts -prefix -list -- [split $cmdstring "\n\r"]
-        }
-        default {
-            error "Step: Unknown OP '$op' for '$cmdstring'."
-        }
-    }
-    uplevel 1 ::TagmaDebug::debug [list $cmdstring]
-}
-
-# ::TagmaDebug::__Step -- {{{2
-#   Fake Step to hide the first step.
-#   This step is really the uplevel call to start debugging.
-#   There is no need to see that.
-#
-# Arguments:
-#   From the trace command.
-#
-# Result:
-#   None
-#
-# Side effect:
-#   Renames Step to __Step.
-#   Renames _Step to Step.
-proc ::TagmaDebug::Step {cmdstring op} {
-    rename ::TagmaDebug::Step ::TagmaDebug::__Step
-    rename ::TagmaDebug::_Step ::TagmaDebug::Step
-}
-
-# ::TagmaDebug::Unstep -- {{{2
-#   Removes the enter trace from a command.
-#
-# Arguments:
-#   name        The command name.
-#
-# Result:
-#   -1 if the command is not found in the step list.
-#
-# Side effect:
-#   Tracing is disabled on the command.
-#   The variable name is removed from the step list.
-proc ::TagmaDebug::Unstep {name} {
-    variable step
-    set i [lsearch -exact $step $name]
-    if {$i < 0} {return -1}
-    set step [lreplace $step $i $i]
-    catch {
-        trace remove execution $name enterstep ::TagmaDebug::Step
-    }
+    set $list [lreplace [set $list] $i $i]
+    uplevel 2 [list trace remove variable $name {read write unset} \
+                          "::TagmaDebug::VarCallback $list"]
     return 0
 }
 
@@ -713,12 +605,14 @@ proc ::TagmaDebug::debug {{cmdstring ""}} {
                     log     {
                         variable log
                         set log [Store $log $value]
-                        uplevel 1 [list trace add variable $value {read write unset} "::TagmaDebug::VarCallback log"]
+                        uplevel 1 [list trace add variable $value {read write unset} \
+                                              "::TagmaDebug::VarCallback log"]
                     }
                     break   {
                         variable break
                         set break [Store $break $value]
-                        uplevel 1 [list trace add variable $value {read write unset} "::TagmaDebug::VarCallback break"]
+                        uplevel 1 [list trace add variable $value {read write unset} \
+                                              "::TagmaDebug::VarCallback break"]
                     }
                     info    {
                         foreach {n t} {log Logged break "Breaks at"} {
@@ -759,7 +653,7 @@ proc ::TagmaDebug::debug {{cmdstring ""}} {
                         }
                         variable enter
                         set enter [Store $enter $value]
-                        trace add execution $value enter ::TagmaDebug::Enter
+                        trace add execution $value enter ::TagmaDebug::CmdCallback
                     }
                     leave   {
                         if {![CheckCommand $value]} {
@@ -769,7 +663,7 @@ proc ::TagmaDebug::debug {{cmdstring ""}} {
                         }
                         variable leave
                         set leave [Store $leave $value]
-                        trace add execution $value leave ::TagmaDebug::Leave
+                        trace add execution $value leave ::TagmaDebug::CmdCallback
                     }
                     step    {
                         if {![CheckCommand $value]} {
@@ -779,7 +673,7 @@ proc ::TagmaDebug::debug {{cmdstring ""}} {
                         }
                         variable step
                         set step [Store $step $value]
-                        trace add execution $value enterstep ::TagmaDebug::Step
+                        trace add execution $value enterstep ::TagmaDebug::CmdCallback
                     }
                     info    {
                         foreach {n t} {enter Enters leave Leaves step Stepping} {
@@ -790,16 +684,13 @@ proc ::TagmaDebug::debug {{cmdstring ""}} {
                         }
                     }
                     clear   {
-                        foreach {v t cmd} {enter Enters   Unenter
-                                           leave Leaves   Unleave
-                                           step  Stepping Unstep} {
+                        foreach {v t} {enter Enters leave Leaves step  Stepping} {
                             EPuts "clearing $t..."
                             variable $v
                             foreach i [set $v] {
                                 if {[string match $value $i]} {
                                     EPuts $i
-                                    # 'unenters', 'unleaves' or 'unstep' the command
-                                    ::TagmaDebug::$cmd $i
+                                    ::TagmaDebug::RemoveCmdTrace $i $v
                                 }
                             }
                         }
@@ -808,6 +699,12 @@ proc ::TagmaDebug::debug {{cmdstring ""}} {
                 }
             }
             con {
+                if {[llength $input] > 1} {
+                    set settings(serverHost) [lindex $input 1]
+                }
+                if {[llength $input] > 2} {
+                    set settings(serverPort) [lindex $input 2]
+                }
                 OpenConnection $line
             }
             r       {
@@ -968,10 +865,10 @@ proc ::TagmaDebug::Prepare {} {
     # Set the trace on the top level procedure.
     variable step
     set step [Store $step __TagmaDebugMain]
-    trace add execution __TagmaDebugMain enterstep ::TagmaDebug::Step
+    trace add execution __TagmaDebugMain enterstep ::TagmaDebug::CmdCallback
 
     # Always catch at the end of the program.
-    trace add execution __TagmaDebugComplete enter ::TagmaDebug::Enter
+    trace add execution __TagmaDebugComplete enter ::TagmaDebug::CmdCallback
 
     # Traces to re-enable debugging after certain commands.
     trace add execution package leave ::TagmaDebug::EnableDebug
@@ -1035,6 +932,7 @@ proc unknown {args} {
         ::TagmaDebug::EPuts "'unknown' has been invoked with: $args"
     }
 
+    # Call the original "unknown" safely.
     if {[catch {uplevel 1 [list _tagma_unknown {*}$args]} msg]} {
         ::TagmaDebug::EPuts "Error from 'unknown': $msg"
         if {$::TagmaDebug::settings(verbose)} {
