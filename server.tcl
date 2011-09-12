@@ -28,6 +28,7 @@ namespace eval ::TagmaServer:: {
     }
     variable endshell 0
 }
+
 # ::TagmaDebug::print -- {{{1
 #   Prints string(s).
 #   Each string is printed on a separate line.

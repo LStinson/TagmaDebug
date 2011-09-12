@@ -282,8 +282,8 @@ proc ::TagmaDebug::_CmdCallback {args} {
         leave {
             EPuts -prefix "Leaving: [lindex $cmdstring 0]"
             if {$settings(verbose)} {
-                set code [lindex args 1]
-                set result [lindex args 2]
+                set code [lindex $args 1]
+                set result [lindex $args 2]
                 EPuts -prefix "Result Code: $code"
                 EPuts -prefix "Result: [list $result]"
             }
@@ -482,7 +482,7 @@ proc ::TagmaDebug::PrintHelp {} {
         "    P           Toggle stepping into package."
         "    V           Toggle verbosity. (Print extra info, when available.)"
         "Based on TclDebugger by S.Arnold. v0.1 2007-09-09 http://wiki.tcl.tk/19872"
-        }
+    }
 }
 
 # ::TagmaDebug::debug -- {{{2
@@ -699,13 +699,13 @@ proc ::TagmaDebug::debug {{cmdstring ""}} {
                 }
             }
             con {
-                if {[llength $input] > 1} {
-                    set settings(serverHost) [lindex $input 1]
+                if {[llength $line] > 1} {
+                    set settings(serverHost) [lindex $line 1]
                 }
-                if {[llength $input] > 2} {
-                    set settings(serverPort) [lindex $input 2]
+                if {[llength $line] > 2} {
+                    set settings(serverPort) [lindex $line 2]
                 }
-                OpenConnection $line
+                OpenConnection
             }
             r       {
                 variable argv0
@@ -802,7 +802,7 @@ proc ::TagmaDebug::CmdLineOpts {} {
                 if {$count < $numargs} {
                     set settings(serverHost) [lindex $argv $count]
                 } else {
-                    usage "Host requored for '-H'."
+                    Usage "Host requored for '-H'."
                 }
                 incr count
             }
@@ -814,7 +814,7 @@ proc ::TagmaDebug::CmdLineOpts {} {
                 if {$count < $numargs} {
                     set settings(serverPort) [lindex $argv $count]
                 } else {
-                    usage "Port requored for '-P'."
+                    Usage "Port requored for '-P'."
                 }
                 incr count
             }
