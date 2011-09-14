@@ -459,6 +459,7 @@ proc ::TagmaDebug::PrintHelp {} {
         "    c or Enter  Continue execution."
         "    h or ?      Prints this message."
         "    e or \[..\]   Evaluates a command."
+        "    f or ff     Print the stack frame. ff also prints file information."
         "    var         Watchs the modifications of some variables."
         "        log     Logs all modifications to stderr."
         "        break   Adds breakpoint for writes."
@@ -567,6 +568,41 @@ proc ::TagmaDebug::debug {{cmdstring ""}} {
             e       {
                 if {[catch {EPuts [uplevel 1 [lrange $line 1 end]]} msg]} {
                     EPuts "Error: $msg"
+                }
+            }
+            f - ff {
+                set lineFormat "%2s %2s %-6s %-30s %-30s"
+                set topFrame [info frame]
+                EPuts [format $lineFormat "F#" "L#" "Type" "Proc" "Cmd"]
+                for {set i 1} {$i < $topFrame} {incr i} {
+                    set frameInfo [info frame $i]
+                    if {[string match "::TagmaDebug::*" [dict get $frameInfo cmd]]} {
+                        break
+                    }
+                    set frameType [dict get $frameInfo type]
+                    if {$frameType eq "precompiled"} {
+                        set frameType "precmp"
+                    }
+                    set frameCmd [lindex [split [dict get $frameInfo cmd] "\r\n"] 0]
+                    if {[string length $frameCmd] != [string length [dict get $frameInfo cmd]]} {
+                        set frameCmd "$frameCmd ..."
+                    }
+                    if {[dict exists $frameInfo "level"]} {
+                        set frameLevel [dict get $frameInfo level]
+                    } else {
+                        set frameLevel ""
+                    }
+                    if {[dict exists $frameInfo "proc"]} {
+                        set frameProc [dict get $frameInfo proc]
+                    } else {
+                        set frameProc "N/A"
+                    }
+                    EPuts [format $lineFormat $i $frameLevel $frameType $frameProc $frameCmd]
+                    if {$command eq "ff" && $frameType eq "source"} {
+                        EPuts [format $lineFormat "" "@"  \
+                              [dict get $frameInfo line]  \
+                              [dict get $frameInfo file] ""]
+                    }
                 }
             }
             h - ?   {

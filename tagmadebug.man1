@@ -124,7 +124,7 @@
 .\" ========================================================================
 .\"
 .IX Title "MAN 1"
-.TH MAN 1 "2011-09-03" "perl v5.10.1" "User Contributed Perl Documentation"
+.TH MAN 1 "2011-09-13" "perl v5.10.1" "User Contributed Perl Documentation"
 .\" For nroff, turn off justification.  Always turn off hyphenation; it makes
 .\" way too many mistakes in technical documents.
 .if n .ad l
@@ -205,6 +205,13 @@ Evaluates \s-1TCL\s0 code. When using \fB[..]\fR The closing ']' is required.
 .IP "\fBh\fR or \fB?\fR" 12
 .IX Item "h or ?"
 Prints the help text.
+.IP "\fBf\fR or \fBff\fR" 12
+.IX Item "f or ff"
+Prints the stack frame. \fBff\fR prints also prints the line and file, when
+available.
+.Sp
+Prints the Frame #, Level # (as in info level), Procedure name and command.
+The command is truncated if it is multiple lines.
 .IP "\fBvar log\fR" 12
 .IX Item "var log"
 Logs all modifications of a variable to stderr.

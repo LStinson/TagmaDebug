@@ -66,6 +66,13 @@ COMMANDS
 
     h or ?      Prints the help text.
 
+    f or ff     Prints the stack frame. ff prints also prints the line and
+                file, when available.
+
+                Prints the Frame #, Level # (as in info level), Procedure
+                name and command. The command is truncated if it is multiple
+                lines.
+
     var log     Logs all modifications of a variable to stderr.
 
     var break   Adds breakpoint for writes to a variable.

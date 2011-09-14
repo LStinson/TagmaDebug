@@ -96,6 +96,14 @@ Evaluates TCL code. When using B<[..]> The closing ']' is required.
 
 Prints the help text.
 
+=item B<f> or B<ff>
+
+Prints the stack frame. B<ff> prints also prints the line and file, when
+available.
+
+Prints the Frame #, Level # (as in info level), Procedure name and command.
+The command is truncated if it is multiple lines.
+
 =item B<var log>
 
 Logs all modifications of a variable to stderr.
