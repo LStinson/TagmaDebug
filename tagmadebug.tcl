@@ -163,6 +163,34 @@ proc ::TagmaDebug::OpenConnection {} {
     set settings(socket) $socket
 }
 
+# ::TagmaDebug::PrintErrorDetail -- {{{2
+#   Prints details from an uncaught error
+#
+# Arguments:
+#   errCode     The error code.
+#   stackTrace  The stack trace.
+#   errMsg      The error message.
+#
+# Result:
+#   None
+#
+# Side effect:
+#   The error details are printed.
+proc ::TagmaDebug::PrintErrorDetail {errCode stackTrace errMsg} {
+    EPuts -prefix "Uncaught error thrown!"
+    switch -exact -- $errCode {
+        1 { set codeDescr "TCL_ERROR" }
+        2 { set codeDescr "TCL_RETURN" }
+        3 { set codeDescr "TCL_BREAK" }
+        4 { set codeDescr "TCL_CONTINUE" }
+        default { set codeDescr "Unknown" }
+    }
+    EPuts -prefix "Error Code: $errCode ($codeDescr)"
+    EPuts -prefix "Error Message: $errMsg"
+    EPuts -prefix "Stack Trace:"
+    EPuts -prefix -list [split $stackTrace "\r\n"]
+}
+
 # ::TagmaDebug::PrintVariable -- {{{2
 #   Prints a variable and its value.
 #
@@ -1006,7 +1034,15 @@ _tagma_proc proc {name args body} {
     }
 }
 
-# Prepare and go!
+# Prepare and go! {{{2
 ::TagmaDebug::Prepare
-__TagmaDebugMain
+if {$tcl_version == 8.5} {
+    if {[set errCode [catch {__TagmaDebugMain} errMsg errOpts]]} {
+        ::TagmaDebug::PrintErrorDetail $errCode [dict get $errOpts -errorinfo] $errMsg
+    }
+} else {
+    if {[set errCode [catch {__TagmaDebugMain} errMsg]]} {
+        ::TagmaDebug::PrintErrorDetail $errCode $::errorInfo $errMsg
+    }
+}
 __TagmaDebugComplete
