@@ -13,18 +13,21 @@
 namespace eval ::TagmaDebug:: {
     variable argv       $::argv
     variable argv0      $::argv0
-    variable break      {}
-    variable enter      {}
-    variable leave      {}
-    variable log        {}
+    variable traces
+    array set traces {
+        varbreak        {}
+        varlog          {}
+        enter           {}
+        enterstep       {}
+        leave           {}
+    }
     variable procs      {}
-    variable step       {}
-    variable debugDisabled 0
-    variable debugDisabledCmd ""
     variable settings
     array set settings {
         body        1
         descr       "TagmaDebug by Lorance Stinson AT Gmail..."
+        disabled    0
+        disablecmd  ""
         enter       1
         packages    0
         prefix      ">>"
@@ -233,10 +236,9 @@ proc ::TagmaDebug::var {name key} {
 #   Disables logging if entering the debugger
 #   Enters the debugger prompt.
 proc ::TagmaDebug::_CmdCallback {args} {
-    variable debugDisabled
     variable settings
 
-    if {$debugDisabled} { return }
+    if {$settings(disabled)} { return }
 
     # Extract the parts needed from the args.
     set cmdstring [lindex $args 0]
@@ -246,28 +248,27 @@ proc ::TagmaDebug::_CmdCallback {args} {
     switch -glob -- $cmdstring {
         ::TagmaDebug::* {
             # Disable for the debugger its self.
-            set debugDisabled 1
+            set settings(disabled) 1
             return
         }
         "proc *" {
             # Disable debug, but show the user it was called.
-            set debugDisabled 1
+            set settings(disabled) 1
             if {!$settings(body)} {
                 set cmdstring [lrange $cmdstring 0 end-1]
             }
         }
         "::unknown *" {
             # Disable debug, but show the user it was called.
-            set debugDisabled 1
+            set settings(disabled) 1
         }
         "package *" {
             if {!$settings(packages)} {
                 # Disable debug, but show the user it was called.
                 # Will not be re-enabled till after the command exits.
                 # See EnableDebug for more information.
-                variable debugDisabledCmd
-                set debugDisabled -1
-                set debugDisabledCmd $cmdstring
+                set settings(disabled) -1
+                set settings(disablecmd) $cmdstring
             }
         }
     }
@@ -322,25 +323,20 @@ proc ::TagmaDebug::CmdCallback {args} {
 #
 # Arguments:
 #   name        The name of the command.
-#   list        The list to remove the command from.
+#   op          The operation to remove the trace for.
 #
 # Result:
 #   -1 if the variable is not found in the list.
 #
 # Side effect:
 #   Tracing is disabled on the command.
-#   The command name is removed from the list.
-proc ::TagmaDebug::RemoveCmdTrace {name list} {
-    variable $list
-    set i [lsearch -exact [set $list] $name]
+#   The command name is removed from the trace list.
+proc ::TagmaDebug::RemoveCmdTrace {name op} {
+    variable traces
+    set i [lsearch -exact $traces($op) $name]
     if {$i < 0} {return -1}
-    set $list [lreplace [set $list] $i $i]
+    set traces($op) [lreplace $traces($op) $i $i]
 
-    if {$list eq "step"} {
-        set op "enterstep"
-    } else {
-        set op $list
-    }
     catch { trace remove execution $name $op ::TagmaDebug::CmdCallback }
     return 0
 }
@@ -349,7 +345,7 @@ proc ::TagmaDebug::RemoveCmdTrace {name list} {
 #   Callback for tracing variables.
 #
 # Arguments:
-#   mode        The mode (break or log).
+#   mode        The mode (varbreak or varlog).
 #   From the trace command.
 #
 # Result:
@@ -377,13 +373,13 @@ proc ::TagmaDebug::VarCallback {mode name1 name2 op} {
         }
     }
 
-    if {$mode eq "break"} {
+    if {$mode eq "varbreak"} {
         uplevel 1 ::TagmaDebug::debug
     }
 
     # Re-enable debugging.
-    variable debugDisabled
-    if {$debugDisabled > 0} {set debugDisabled 0}
+    variable settings
+    if {$settings(disabled) > 0} {set settings(disabled) 0}
 }
 
 # ::TagmaDebug::RemoveVarTrace -- {{{2
@@ -401,10 +397,10 @@ proc ::TagmaDebug::VarCallback {mode name1 name2 op} {
 #   Tracing is disabled on the variable.
 #   The variable name is removed from the list.
 proc ::TagmaDebug::RemoveVarTrace {name list} {
-    variable $list
-    set i [lsearch -exact [set $list] $name]
+    variable traces
+    set i [lsearch -exact $traces($list) $name]
     if {$i < 0} {return -1}
-    set $list [lreplace [set $list] $i $i]
+    set traces($list) [lreplace $traces($list) $i $i]
     uplevel 2 [list trace remove variable $name {read write unset} \
                           "::TagmaDebug::VarCallback $list"]
     return 0
@@ -424,11 +420,10 @@ proc ::TagmaDebug::RemoveVarTrace {name list} {
 #   Prints the command that is about to be executed
 #   Disables debugging upon entering TagmaDebug.
 proc ::TagmaDebug::EnableDebug {cmdstring code result op} {
-    variable debugDisabledCmd
-    if {$cmdstring eq $debugDisabledCmd} {
-        variable debugDisabled
-        set debugDisabled 0
-        set debugDisabledCmd ""
+    variable settings
+    if {$cmdstring eq $settings(disablecmd)} {
+        set settings(disabled) 0
+        set settings(disablecmd) ""
         variable settings
         if {$settings(verbose)} {
             EPuts -prefix "Leaving: $cmdstring"
@@ -507,31 +502,31 @@ proc ::TagmaDebug::debug {{cmdstring ""}} {
         append flags [expr {$settings(enter)    ? "E" : ""}]
         append flags [expr {$settings(packages) ? "P" : ""}]
         append flags [expr {$settings(verbose)  ? "V" : ""}]
-        set level [uplevel 1 info level]
+        set levelNum [uplevel 1 info level]
         set command ""
-        if {$level > 0} {
+        if {$levelNum > 0} {
             set command " => [lindex [uplevel 1 info level 0] 0]"
         }
 
         # Prompt and wait for input.
         if {$settings(server)} {
-            EPuts "{$flags}($level$command)$settings(prompt)"
+            EPuts "{$flags}($levelNum$command)$settings(prompt)"
         } else {
-            EPuts -nonewline "{$flags}($level$command)$settings(prompt)"
+            EPuts -nonewline "{$flags}($levelNum$command)$settings(prompt)"
             flush stderr
         }
 
         if {$settings(server)} {
-            if {[gets $settings(socket) line] < 0} {
+            if {[gets $settings(socket) input] < 0} {
                 CloseConnection
                 continue
             }
-        } elseif {[gets stdin line] < 0} {
+        } elseif {[gets stdin input] < 0} {
             puts ""
             exit
         }
 
-        if {$line eq ""} {
+        if {$input eq ""} {
             if {$settings(enter)} {
                 return
             } else {
@@ -540,22 +535,22 @@ proc ::TagmaDebug::debug {{cmdstring ""}} {
         }
 
         # Special case, execute anything embedded in '[...]'.
-        if {[string index $line 0] eq "\["} {
-            if {[catch {EPuts [uplevel 1 [string range $line 1 end-1]]} msg]} {
+        if {[string index $input 0] eq "\["} {
+            if {[catch {EPuts [uplevel 1 [string range $input 1 end-1]]} msg]} {
                 EPuts "Error: $msg"
             }
             continue
         }
 
-        set command [lindex $line 0]
+        set command [lindex $input 0]
         switch -- $command {
             !       {
-                if {[catch {EPuts [exec -ignorestderr -- [lrange $line 1 end]]} msg]} {
+                if {[catch {EPuts [exec -ignorestderr -- [lrange $input 1 end]]} msg]} {
                     EPuts "Error: $msg"
                 }
             }
             =       {
-                foreach var [lrange $line 1 end] {
+                foreach var [lrange $input 1 end] {
                     uplevel 1 ::TagmaDebug::PrintVariable $var
                 }
             }
@@ -566,7 +561,7 @@ proc ::TagmaDebug::debug {{cmdstring ""}} {
                 return
             }
             e       {
-                if {[catch {EPuts [uplevel 1 [lrange $line 1 end]]} msg]} {
+                if {[catch {EPuts [uplevel 1 [lrange $input 1 end]]} msg]} {
                     EPuts "Error: $msg"
                 }
             }
@@ -610,11 +605,11 @@ proc ::TagmaDebug::debug {{cmdstring ""}} {
             }
             procs   {
                 variable procs
-                if {[llength $line] eq 1} {
+                if {[llength $input] eq 1} {
                     EPuts -list $procs
                 } else {
                     set list {}
-                    set search [lindex $line 1]
+                    set search [lindex $input 1]
                     foreach proc $procs {
                         if {[string match $search $proc]} {
                             lappend list $proc
@@ -626,43 +621,40 @@ proc ::TagmaDebug::debug {{cmdstring ""}} {
             p       {
                 set command "::"
                 set level [uplevel 1 info level]
-                if {$level > 0} {
+                if {$levelNum > 0} {
                     set command [uplevel 1 info level 0]
                 }
-                EPuts "($level) $command"
+                EPuts "($levelNum) $command"
             }
             var     {
-                if {[llength $line] < 2 || [llength $line] > 3} {
+                if {[llength $input] < 2 || [llength $input] > 3} {
                     EPuts "Bad Syntax! $command requires 1 or 2 arguments."
                     continue
                 }
-                foreach {subcmd value} [lrange $line 1 end] {break}
+                foreach {subcmd value} [lrange $input 1 end] {break}
+                variable traces
                 switch -- $subcmd {
                     log     {
-                        variable log
-                        set log [Store $log $value]
+                        set traces(varlog) [Store $traces(varlog) $value]
                         uplevel 1 [list trace add variable $value {read write unset} \
-                                              "::TagmaDebug::VarCallback log"]
+                                              "::TagmaDebug::VarCallback varlog"]
                     }
                     break   {
-                        variable break
-                        set break [Store $break $value]
+                        set traces(varbreak) [Store $traces(varbreak) $value]
                         uplevel 1 [list trace add variable $value {read write unset} \
-                                              "::TagmaDebug::VarCallback break"]
+                                              "::TagmaDebug::VarCallback varbreak"]
                     }
                     info    {
-                        foreach {n t} {log Logged break "Breaks at"} {
-                            variable $n
+                        foreach {n t} {varlog Logged varbreak "Breaks at"} {
                             EPuts "=== $t: ==="
-                            EPuts [lsort [set $n]]
+                            EPuts [lsort $traces($n)]
                             EPuts "----"
                         }
                     }
                     clear   {
-                        foreach {v t} {log Logged break Breaks} {
+                        foreach {v t} {varlog Logged varbreak Breaks} {
                             EPuts "clearing $t..."
-                            variable $v
-                            foreach i [set $v] {
+                            foreach i $traces($v) {
                                 if {[string match $value $i]} {
                                     EPuts $i
                                     # Removes the trace from a variable.
@@ -675,11 +667,12 @@ proc ::TagmaDebug::debug {{cmdstring ""}} {
                 }
             }
             cmd     {
-                if {[llength $line] < 2 || [llength $line] > 3} {
+                if {[llength $input] < 2 || [llength $input] > 3} {
                     EPuts "Bad Syntax! $command requires 1 or 2 arguments."
                     continue
                 }
-                foreach {subcmd value} [lrange $line 1 end] {break}
+                foreach {subcmd value} [lrange $input 1 end] {break}
+                variable traces
                 switch -- $subcmd {
                     enter   {
                         if {![CheckCommand $value]} {
@@ -687,8 +680,7 @@ proc ::TagmaDebug::debug {{cmdstring ""}} {
                             EPuts "Can not set a break point for a non-existant command."
                             continue
                         }
-                        variable enter
-                        set enter [Store $enter $value]
+                        set traces(enter) [Store $traces(enter) $value]
                         trace add execution $value enter ::TagmaDebug::CmdCallback
                     }
                     leave   {
@@ -697,8 +689,7 @@ proc ::TagmaDebug::debug {{cmdstring ""}} {
                             EPuts "Can not set a break point for a non-existant command."
                             continue
                         }
-                        variable leave
-                        set leave [Store $leave $value]
+                        set traces(leave_ [Store $traces(leave) $value]
                         trace add execution $value leave ::TagmaDebug::CmdCallback
                     }
                     step    {
@@ -707,23 +698,20 @@ proc ::TagmaDebug::debug {{cmdstring ""}} {
                             EPuts "Can not set a break point for a non-existant command."
                             continue
                         }
-                        variable step
-                        set step [Store $step $value]
+                        set traces(enterstep) [Store $traces(enterstep) $value]
                         trace add execution $value enterstep ::TagmaDebug::CmdCallback
                     }
                     info    {
-                        foreach {n t} {enter Enters leave Leaves step Stepping} {
-                            variable $n
+                        foreach {n t} {enter Enters leave Leaves enterstep Stepping} {
                             EPuts "=== $t: ==="
-                            EPuts [lsort [set $n]]
+                            EPuts [lsort $traces($n)]
                             EPuts "----"
                         }
                     }
                     clear   {
-                        foreach {v t} {enter Enters leave Leaves step  Stepping} {
+                        foreach {v t} {enter Enters leave Leaves enterstep Stepping} {
                             EPuts "clearing $t..."
-                            variable $v
-                            foreach i [set $v] {
+                            foreach i $traces($v) {
                                 if {[string match $value $i]} {
                                     EPuts $i
                                     ::TagmaDebug::RemoveCmdTrace $i $v
@@ -735,11 +723,11 @@ proc ::TagmaDebug::debug {{cmdstring ""}} {
                 }
             }
             con {
-                if {[llength $line] > 1} {
-                    set settings(serverHost) [lindex $line 1]
+                if {[llength $input] > 1} {
+                    set settings(serverHost) [lindex $input 1]
                 }
-                if {[llength $line] > 2} {
-                    set settings(serverPort) [lindex $line 2]
+                if {[llength $input] > 2} {
+                    set settings(serverPort) [lindex $input 2]
                 }
                 OpenConnection
             }
@@ -899,8 +887,8 @@ proc ::TagmaDebug::Prepare {} {
     }
 
     # Set the trace on the top level procedure.
-    variable step
-    set step [Store $step __TagmaDebugMain]
+    variable traces
+    set traces(enterstep) [Store $traces(enterstep) __TagmaDebugMain]
     trace add execution __TagmaDebugMain enterstep ::TagmaDebug::CmdCallback
 
     # Always catch at the end of the program.
@@ -978,8 +966,9 @@ proc unknown {args} {
     }
 
     # Re-enable debugging.
-    variable ::TagmaDebug::debugDisabled
-    if {$debugDisabled > 0} {set debugDisabled 0}
+    if {$::TagmaDebug::settings(disabled) > 0} {
+        set ::TagmaDebug::settings(disabled) 0
+    }
 }
 
 # proc -- {{{2
@@ -1012,8 +1001,9 @@ _tagma_proc proc {name args body} {
     _tagma_proc $name $args $body
 
     # Re-enable debugging.
-    variable ::TagmaDebug::debugDisabled
-    if {$debugDisabled > 0} {set debugDisabled 0}
+    if {$::TagmaDebug::settings(disabled) > 0} {
+        set ::TagmaDebug::settings(disabled) 0
+    }
 }
 
 # Prepare and go!
