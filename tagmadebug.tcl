@@ -21,7 +21,8 @@ namespace eval ::TagmaDebug:: {
         enterstep       {}
         leave           {}
     }
-    variable procs      {}
+    variable procs
+    array set procs {}
     variable settings
     array set settings {
         body        1
@@ -274,7 +275,7 @@ proc ::TagmaDebug::_CmdCallback {args} {
 
     # Disable debugging for certain commands.
     switch -glob -- $cmdstring {
-        ::TagmaDebug::* {
+        "::TagmaDebug::*" {
             # Disable for the debugger its self.
             set settings(disabled) 1
             return
@@ -551,7 +552,7 @@ proc ::TagmaDebug::debug {{cmdstring ""}} {
             }
         } elseif {[gets stdin input] < 0} {
             puts ""
-            exit
+            _tagma_exit
         }
 
         if {$input eq ""} {
@@ -607,7 +608,8 @@ proc ::TagmaDebug::debug {{cmdstring ""}} {
                         set frameType "precmp"
                     }
                     set frameCmd [lindex [split [dict get $frameInfo cmd] "\r\n"] 0]
-                    if {[string length $frameCmd] != [string length [dict get $frameInfo cmd]]} {
+                    if {[string length $frameCmd] != 
+                        [string length [dict get $frameInfo cmd]]} {
                         set frameCmd "$frameCmd ..."
                     }
                     if {[dict exists $frameInfo "level"]} {
@@ -634,16 +636,24 @@ proc ::TagmaDebug::debug {{cmdstring ""}} {
             procs   {
                 variable procs
                 if {[llength $input] eq 1} {
-                    EPuts -list $procs
+                    set search ""
                 } else {
-                    set list {}
                     set search [lindex $input 1]
-                    foreach proc $procs {
-                        if {[string match $search $proc]} {
-                            lappend list $proc
-                        }
+                }
+                set lineFormat "%-20s %-20s %5s %s"
+                set topFrame [info frame]
+                EPuts [format $lineFormat "Name" "Args" "Line" "File"]
+                foreach proc [lsort [array names procs]] {
+                    if {$search ne "" && ![string match $search $proc]} {
+                        continue
                     }
-                    EPuts -list $list
+                    set procInfo $procs($proc)
+                    EPuts [format $lineFormat \
+                                  $proc \
+                                  "{[uplevel 1 info args $proc]}" \
+                                  [dict get $procInfo line] \
+                                  [dict get $procInfo file] \
+                            ]
                 }
             }
             p       {
@@ -760,13 +770,14 @@ proc ::TagmaDebug::debug {{cmdstring ""}} {
                 OpenConnection
             }
             r       {
-                variable argv0
-                variable argv
-                eval exec [list [info nameofexecutable] $argv0] $argv
-                exit
+                EPuts "This feature is currently broken."
+                #variable argv0
+                #variable argv
+                #eval exec [list [info nameofexecutable] $argv0] $argv
+                #exit
             }
             x - q   {
-                exit
+                _tagma_exit
             }
             B       {
                 set settings(body) [expr {!$settings(body)}]
@@ -946,7 +957,7 @@ proc ::TagmaDebug::Prepare {} {
 # Side effect:
 #   The passed script is run.
 proc __TagmaDebugMain {} {
-    uplevel 1 "source $::argv0"
+    uplevel \#0 "source $::argv0"
 }
 
 # __TagmaDebugComplete -- {{{2
@@ -999,6 +1010,25 @@ proc unknown {args} {
     }
 }
 
+# exit -- {{{2
+#   Replacement for "exit" to prevent the debugger unexpectedly dying.
+#
+# Arguments:
+#   args        Arguments normally passed to exit.
+#
+# Result:
+#   None
+#
+# Side effect:
+#   Prints the args if verbose.
+rename exit _tagma_exit
+proc exit {args} {
+    ::TagmaDebug::EPuts "'exit' has been invoked with: $args"
+    ::TagmaDebug::debug
+    ::TagmaDebug::EPuts "Exiting..."
+    _tagma_exit
+}
+
 # proc -- {{{2
 #   Replacement for "proc" to record procedures as they are created.
 #
@@ -1022,8 +1052,21 @@ _tagma_proc proc {name args body} {
         ::TagmaDebug::EPuts "Creating procedure '$name' {$args}."
     }
 
+    # Find the source information for the procedure.
+    # Walk down the stack frame until an entry not related to TagmaDebug is
+    # encountered. That frame *should* be from the source file.
+    # TODO Verify this assumption.
+    set topFrame [info frame]
+    for {set i [expr {$topFrame - 1}]} {$i > 0} {incr i -1} {
+        set frameInfo [info frame $i]
+        if {[string match "::TagmaDebug::*" [dict get $frameInfo cmd]]} {
+            continue
+        }
+        break
+    }
+
     # Add the procedure to the procs list.
-    set ::TagmaDebug::procs [::TagmaDebug::Store $::TagmaDebug::procs $name]
+    set ::TagmaDebug::procs($name) $frameInfo
 
     # Create the procedure.
     _tagma_proc $name $args $body
@@ -1037,11 +1080,13 @@ _tagma_proc proc {name args body} {
 # Prepare and go! {{{2
 ::TagmaDebug::Prepare
 if {$tcl_version == 8.5} {
-    if {[set errCode [catch {__TagmaDebugMain} errMsg errOpts]]} {
+    set errCode [catch {__TagmaDebugMain} errMsg errOpts]
+    if {$errCode} {
         ::TagmaDebug::PrintErrorDetail $errCode [dict get $errOpts -errorinfo] $errMsg
     }
 } else {
-    if {[set errCode [catch {__TagmaDebugMain} errMsg]]} {
+    set errCode [catch {__TagmaDebugMain} errMsg]
+    if {$errCode} {
         ::TagmaDebug::PrintErrorDetail $errCode $::errorInfo $errMsg
     }
 }
