@@ -124,14 +124,13 @@
 .\" ========================================================================
 .\"
 .IX Title "MAN 1"
-.TH MAN 1 "2011-09-13" "perl v5.10.1" "User Contributed Perl Documentation"
+.TH MAN 1 "2011-10-01" "perl v5.10.1" "User Contributed Perl Documentation"
 .\" For nroff, turn off justification.  Always turn off hyphenation; it makes
 .\" way too many mistakes in technical documents.
 .if n .ad l
 .nh
-.SS "\s-1NAME\s0"
-.IX Subsection "NAME"
-TagmaDebug \- Interactive \s-1TCL\s0 Debugger
+.SH "NAME"
+TagmaDebug \- Interactive TCL Debugger
 .SH "SYNOPSIS"
 .IX Header "SYNOPSIS"
 tagmadebug.tcl [Options] [\-\-] YourScript.tcl
@@ -139,7 +138,7 @@ tagmadebug.tcl [Options] [\-\-] YourScript.tcl
 .IX Header "OPTIONS"
 .IP "\fB\-c\fR" 10
 .IX Item "-c"
-Connect to a Tagma debug control server.
+Connect to a TagmaDebug control server.
 .IP "\fB\-H\fR \s-1HOST\s0" 10
 .IX Item "-H HOST"
 Connect to \s-1HOST\s0 instead of localhost.
@@ -162,22 +161,20 @@ time.
 .PP
 The \fBunknown\fR command is replaced and the original called. If the original
 unknown throws an error it is caught. The error message is displayed and the
-debugger is entered.
+debugger is entered. The debugger will not step into unknown.
 .PP
 All output from the debugger is written to \fBstderr\fR. This allows for
 redirection of the program or debugger output if desired.
-.PP
-The debugger will not step into unknown.
 .SH "PROMPT"
 .IX Header "PROMPT"
 The prompt is composed of flags in curly brackets '{}', the level of
 execution, the procedure (if one is executing) and the name of the debugger.
 .PP
 The flags indicate when certain features are enabled. 'B' indicates the body
-of precedures will be displayed. If disabled only the procedure name and
+of procedures will be displayed. If disabled only the procedure name and
 arguments are printed. 'E' indicates enter will continue a step, the same as
 typing 'c Enter'. 'P' indicates packages will be stepped into. 'V' indicates
-verbose mode is enabled.  This will cause additional output in certain places.
+verbose mode is enabled. This will cause additional output in certain places.
 .PP
 Sample prompt: {E}(1 => foo)Tagma>
 .PP
@@ -241,7 +238,7 @@ Clear break points. Passes the command to [string match ...] so globbing can
 be used.
 .IP "\fBcon\fR" 12
 .IX Item "con"
-Connect to a Tagma Debug control server.
+Connect to a TagmaDebug control server.
 Optional Host and port. (Default: localhost and 5444)
 .IP "\fBp\fR" 12
 .IX Item "p"
@@ -268,7 +265,7 @@ Toggle Enter acting as a shortcut to 'c Enter'.
 Toggle stepping into package.
 .IP "\fBV\fR" 8
 .IX Item "V"
-Toggle verbosity. Print extra info, when available.
+oggle verbosity. Print extra info, when available.
 .SH "CONTROL SERVER"
 .IX Header "CONTROL SERVER"
 \&\fB\s-1NOTE:\s0\fR The shell does not work under Tkcon.
@@ -278,10 +275,10 @@ server for remote control. All debugger output and user input is sent to comes
 from the server. The server requires an event loop process to function. By
 default if the program is run it starts the server process, enters the remote
 debug shell and starts an event loop. The shell is designed to make debugging
-similar to using Tagma Debug directly.
+similar to using TagmaDebug directly.
 .PP
 The 'tagma' command is used to control the server and interact with the
-debugger. With no options it sends its areguments to the remote debugger.
+debugger. With no options it sends its arguments to the remote debugger.
 .PP
 \&\fBtagma Options:\fR
 .IP "\fB\-help\fR" 10
@@ -293,7 +290,7 @@ Select from connected debuggers. Lists the available and current connections
 with no arguments.
 .IP "\fB\-shell\fR" 10
 .IX Item "-shell"
-Enter an interactive shell. Simualtes working directly with the debugger. If
+Enter an interactive shell. Simulates working directly with the debugger. If
 there is no active connection it will wait for a client to connect. The server
 must be running before the shell is started.
 .IP "\fB\-start\fR" 10

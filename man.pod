@@ -1,4 +1,4 @@
-=head2 NAME
+=head1 NAME
 
 TagmaDebug - Interactive TCL Debugger
 
@@ -12,7 +12,7 @@ tagmadebug.tcl [Options] [--] YourScript.tcl
 
 =item B<-c>
 
-Connect to a Tagma debug control server.
+Connect to a TagmaDebug control server.
 
 =item B<-H> HOST
 
@@ -42,12 +42,10 @@ time.
 
 The B<unknown> command is replaced and the original called. If the original
 unknown throws an error it is caught. The error message is displayed and the
-debugger is entered.
+debugger is entered. The debugger will not step into unknown.
 
 All output from the debugger is written to B<stderr>. This allows for
 redirection of the program or debugger output if desired.
-
-The debugger will not step into unknown.
 
 =head1 PROMPT
 
@@ -55,10 +53,10 @@ The prompt is composed of flags in curly brackets '{}', the level of
 execution, the procedure (if one is executing) and the name of the debugger.
 
 The flags indicate when certain features are enabled. 'B' indicates the body
-of precedures will be displayed. If disabled only the procedure name and
+of procedures will be displayed. If disabled only the procedure name and
 arguments are printed. 'E' indicates enter will continue a step, the same as
 typing 'c Enter'. 'P' indicates packages will be stepped into. 'V' indicates
-verbose mode is enabled.  This will cause additional output in certain places.
+verbose mode is enabled. This will cause additional output in certain places.
 
 Sample prompt: {E}(1 => foo)Tagma>
 
@@ -141,7 +139,7 @@ be used.
 
 =item B<con>
 
-Connect to a Tagma Debug control server.
+Connect to a TagmaDebug control server.
 Optional Host and port. (Default: localhost and 5444)
 
 =item B<p>
@@ -180,7 +178,7 @@ Toggle stepping into package.
 
 =item B<V>
 
-Toggle verbosity. Print extra info, when available.
+oggle verbosity. Print extra info, when available.
 
 =back
 
@@ -193,10 +191,10 @@ server for remote control. All debugger output and user input is sent to comes
 from the server. The server requires an event loop process to function. By
 default if the program is run it starts the server process, enters the remote
 debug shell and starts an event loop. The shell is designed to make debugging
-similar to using Tagma Debug directly.
+similar to using TagmaDebug directly.
 
 The 'tagma' command is used to control the server and interact with the
-debugger. With no options it sends its areguments to the remote debugger.
+debugger. With no options it sends its arguments to the remote debugger.
 
 B<tagma Options:>
 
@@ -213,7 +211,7 @@ with no arguments.
 
 =item B<-shell>
 
-Enter an interactive shell. Simualtes working directly with the debugger. If
+Enter an interactive shell. Simulates working directly with the debugger. If
 there is no active connection it will wait for a client to connect. The server
 must be running before the shell is started.
 

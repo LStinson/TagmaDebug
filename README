@@ -1,11 +1,11 @@
-  NAME
+NAME
     TagmaDebug - Interactive TCL Debugger
 
 SYNOPSIS
     tagmadebug.tcl [Options] [--] YourScript.tcl
 
 OPTIONS
-    -c        Connect to a Tagma debug control server.
+    -c        Connect to a TagmaDebug control server.
 
     -H HOST   Connect to HOST instead of localhost.
 
@@ -25,12 +25,10 @@ DESCRIPTION
 
     The unknown command is replaced and the original called. If the original
     unknown throws an error it is caught. The error message is displayed and
-    the debugger is entered.
+    the debugger is entered. The debugger will not step into unknown.
 
     All output from the debugger is written to stderr. This allows for
     redirection of the program or debugger output if desired.
-
-    The debugger will not step into unknown.
 
 PROMPT
     The prompt is composed of flags in curly brackets '{}', the level of
@@ -38,7 +36,7 @@ PROMPT
     debugger.
 
     The flags indicate when certain features are enabled. 'B' indicates the
-    body of precedures will be displayed. If disabled only the procedure
+    body of procedures will be displayed. If disabled only the procedure
     name and arguments are printed. 'E' indicates enter will continue a
     step, the same as typing 'c Enter'. 'P' indicates packages will be
     stepped into. 'V' indicates verbose mode is enabled. This will cause
@@ -92,7 +90,7 @@ COMMANDS
     cmd clear   Clear break points. Passes the command to [string match ...]
                 so globbing can be used.
 
-    con         Connect to a Tagma Debug control server. Optional Host and
+    con         Connect to a TagmaDebug control server. Optional Host and
                 port. (Default: localhost and 5444)
 
     p           Prints the current level & procedure. When at the top level
@@ -112,7 +110,7 @@ SETTINGS
 
     P       Toggle stepping into package.
 
-    V       Toggle verbosity. Print extra info, when available.
+    V       oggle verbosity. Print extra info, when available.
 
 CONTROL SERVER
     NOTE: The shell does not work under Tkcon.
@@ -122,12 +120,11 @@ CONTROL SERVER
     sent to comes from the server. The server requires an event loop process
     to function. By default if the program is run it starts the server
     process, enters the remote debug shell and starts an event loop. The
-    shell is designed to make debugging similar to using Tagma Debug
+    shell is designed to make debugging similar to using TagmaDebug
     directly.
 
     The 'tagma' command is used to control the server and interact with the
-    debugger. With no options it sends its areguments to the remote
-    debugger.
+    debugger. With no options it sends its arguments to the remote debugger.
 
     tagma Options:
 
@@ -136,7 +133,7 @@ CONTROL SERVER
     -select   Select from connected debuggers. Lists the available and
               current connections with no arguments.
 
-    -shell    Enter an interactive shell. Simualtes working directly with
+    -shell    Enter an interactive shell. Simulates working directly with
               the debugger. If there is no active connection it will wait
               for a client to connect. The server must be running before the
               shell is started.
